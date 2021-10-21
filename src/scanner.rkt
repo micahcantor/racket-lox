@@ -31,7 +31,7 @@
   (while (not (at-end? s))
          (set-scanner-start! s (scanner-current s)) ; set start of the current scan to the current pos
          (scan-token! s)) ; scan from current pos
-  (define eof-token (token 'EOF "" #f (scanner-line s)))
+  (define eof-token (make-token 'EOF "" (scanner-line s)))
   (set-scanner-tokens! s (cons eof-token (scanner-tokens s)))
   (reverse (scanner-tokens s)))
 
@@ -93,7 +93,7 @@
 
 (define (add-token! s type [literal #f])
   (define text (scanner-substring s))
-  (define new-token (token type text literal (scanner-line s)))
+  (define new-token (make-token type text literal (scanner-line s)))
   (set-scanner-tokens! s (cons new-token (scanner-tokens s))))
 
 (define (scan-string! s)

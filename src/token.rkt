@@ -2,12 +2,15 @@
 
 (require racket/match)
 
-(provide (struct-out token) token-types keywords)
+(provide (struct-out token) token-types keywords make-token)
 
 (struct token
   (type lexeme literal line)
   #:mutable
   #:transparent)
+
+(define (make-token type lexeme [literal #f] [line 1])
+  (token type lexeme literal line))
 
 (define keywords
   (hash
