@@ -29,28 +29,28 @@
 
 ; (parse-equality parser) -> token
 (define (parse-equality p)
-  (define token-matches (map token-types (list 'BANG_EQUAL 'EQUAL_EQUAL)))
+  (define token-matches (list BANG_EQUAL EQUAL_EQUAL))
   (left-assosiative-binary p parse-comparison token-matches))
 
 ; (parse-comparison parser) -> token
 (define (parse-comparison p)
-  (define token-matches (map token-types (list 'GREATER 'GREATER_EQUAL 'LESS 'LESS_EQUAL)))
+  (define token-matches (list GREATER GREATER_EQUAL LESS LESS_EQUAL))
   (left-assosiative-binary p parse-term token-matches))
 
 ; (parse-term parser) -> token
 (define (parse-term p)
-  (define token-matches (map token-types (list 'MINUS 'PLUS)))
+  (define token-matches (list MINUS PLUS))
   (left-assosiative-binary p parse-factor token-matches))
 
 ; (parse-factor parser) -> token
 (define (parse-factor p)
-  (define token-matches (map token-types (list 'SLASH 'STAR)))
+  (define token-matches (list SLASH STAR))
   (left-assosiative-binary p parse-unary token-matches))
 
 ; (parse-unary parser -> token)
 (define (parse-unary p)
   (cond
-    [(matches? p (token-types 'BANG) (token-types 'MINUS))
+    [(matches? p BANG MINUS)
      (define operator (previous p))
      (define right (parse-unary p))
      (unary operator right)]
@@ -59,17 +59,17 @@
 ; (parse-primary parser) -> token
 (define (parse-primary p)
   (cond
-    [(matches? p (token-types 'FALSE))
+    [(matches? p FALSE)
      (literal #f)]
-    [(matches? p (token-types 'TRUE))
+    [(matches? p TRUE)
      (literal #t)]
-    [(matches? p (token-types 'NIL))
+    [(matches? p NIL)
      (literal null)]
-    [(matches? p (token-types 'NUMBER) (token-types 'STRING))
+    [(matches? p NUMBER STRING)
      (literal (token-literal (previous p)))]
-    [(matches? p (token-types 'LEFT_PAREN))
+    [(matches? p LEFT_PAREN)
      (define expr (parse-expression p)) ; parse the following expression
-     (consume p (token-types 'RIGHT_PAREN) "Expect ')' after expression")
+     (consume p RIGHT_PAREN "Expect ')' after expression")
      (grouping expr)]
     [else (raise-parse-error (peek p) "Expect expression")]))
 
@@ -107,7 +107,7 @@
 
 ; (at-end? parser) -> bool
 (define (at-end? p)
-  (equal? (token-type (peek p)) (token-types 'EOF)))
+  (equal? (token-type (peek p)) EOF))
 
 ; (peek parser) -> token
 (define (peek p)
@@ -135,10 +135,10 @@
 ; When the next token is a keyword, we are probably beginning a statement.
 (define (synchronize p)
   (advance! p)
-  (define keywords (map token-type (list 'CLASS 'FUN 'VAR 'FOR 'IF 'WHILE 'PRINT 'RETURN)))
+  (define keywords (list CLASS FUN VAR FOR IF WHILE PRINT RETURN))
   (while (not (at-end? p))
          (cond
-           [(equal? (token-type (previous p)) (token-types 'SEMICOLON))
+           [(equal? (token-type (previous p)) SEMICOLON)
             (void)]
            [(member (token-type (peek p)) keywords)
             (void)]

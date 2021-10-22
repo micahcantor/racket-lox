@@ -12,7 +12,7 @@
 
 (define (lox-error t message)
   (match-define (token type lexeme _ line) t)
-  (if (equal? type (token-types 'EOF))
+  (if (equal? type EOF)
       (report-error line "at end" message)
       (report-error "at '" lexeme message)))
 

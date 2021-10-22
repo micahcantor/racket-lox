@@ -31,30 +31,30 @@
   (while (not (at-end? s))
          (set-scanner-start! s (scanner-current s)) ; set start of the current scan to the current pos
          (scan-token! s)) ; scan from current pos
-  (define eof-token (make-token 'EOF "" (scanner-line s)))
+  (define eof-token (make-token EOF "" (scanner-line s)))
   (set-scanner-tokens! s (cons eof-token (scanner-tokens s)))
   (list->vector (reverse (scanner-tokens s))))
 
 (define (scan-token! s)
   (match (advance! s)
-    [#\( (add-token! s (token-types 'LEFT_PAREN))]
-    [#\) (add-token! s (token-types 'RIGHT_PAREN))]
-    [#\{ (add-token! s (token-types 'LEFT_BRACE))]
-    [#\} (add-token! s (token-types 'RIGHT_BRACE))]
-    [#\, (add-token! s (token-types 'COMMA))]
-    [#\. (add-token! s (token-types 'DOT))]
-    [#\- (add-token! s (token-types 'MINUS))]
-    [#\+ (add-token! s (token-types 'PLUS))]
-    [#\; (add-token! s (token-types 'SEMICOLON))]
-    [#\* (add-token! s (token-types 'STAR))]
-    [#\! (add-token! s (if (matches? s #\=) (token-types 'BANG_EQUAL) (token-types 'BANG)))]
-    [#\= (add-token! s (if (matches? s #\=) (token-types 'EQUAL_EQUAL) (token-types 'EQUAL)))]
-    [#\< (add-token! s (if (matches? s #\=) (token-types 'LESS_EQUAL) (token-types 'LESS)))]
-    [#\> (add-token! s (if (matches? s #\=) (token-types 'GREATER_EQUAL) (token-types 'GREATER)))]
+    [#\( (add-token! s LEFT_PAREN)]
+    [#\) (add-token! s RIGHT_PAREN)]
+    [#\{ (add-token! s LEFT_BRACE)]
+    [#\} (add-token! s RIGHT_BRACE)]
+    [#\, (add-token! s COMMA)]
+    [#\. (add-token! s DOT)]
+    [#\- (add-token! s MINUS)]
+    [#\+ (add-token! s PLUS)]
+    [#\; (add-token! s SEMICOLON)]
+    [#\* (add-token! s STAR)]
+    [#\! (add-token! s (if (matches? s #\=) BANG_EQUAL BANG))]
+    [#\= (add-token! s (if (matches? s #\=) EQUAL_EQUAL EQUAL))]
+    [#\< (add-token! s (if (matches? s #\=) LESS_EQUAL LESS))]
+    [#\> (add-token! s (if (matches? s #\=) GREATER_EQUAL GREATER))]
     [#\/ (if (matches? s #\/)
              (while (and (not (next-is? s #\n)) (not (at-end? s)))
                     (advance! s)) ; ignore comments to the end of a line
-             (add-token! s (token-types 'SLASH)))]
+             (add-token! s  SLASH))]
     [#\newline (scanner-next-line! s)] ; increment line number
     [(? char-blank?) (void)] ; ignore whitespace
     [#\" (scan-string! s)] ; string literals
@@ -108,7 +108,7 @@
      (advance! s) ; consume the closing "
      ; trim the surrounding quotes, add token
      (define value (scanner-substring s (add1 (scanner-start s)) (sub1 (scanner-current s))))
-     (add-token! s (token-types 'STRING) value)]))
+     (add-token! s  STRING value)]))
 
 (define (scan-number! s)
   (while (char-numeric? (peek s)) (advance! s))
@@ -116,7 +116,7 @@
   (when (and (next-is? s #\.) (char-numeric? (peek-next s)))
     (advance! s) ; consume the "."
     (while (char-numeric? (peek s)) (advance! s)))
-  (add-token! s 'NUMBER (string->number (scanner-substring s))))
+  (add-token! s NUMBER (string->number (scanner-substring s))))
 
 (define (char-identifier-start? ch)
   (or (char-alphabetic? ch) (char=? ch #\_)))
@@ -131,4 +131,4 @@
   (define keyword-type (hash-ref keywords text #f))
   (if keyword-type
       (add-token! s keyword-type)
-      (add-token! s 'IDENTIFIER)))
+      (add-token! s IDENTIFIER)))

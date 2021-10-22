@@ -1,8 +1,6 @@
 #lang racket/base
 
-(require racket/match)
-
-(provide (struct-out token) token-types keywords make-token)
+(provide (struct-out token) (all-defined-out))
 
 (struct token
   (type lexeme literal line)
@@ -31,48 +29,42 @@
    "var" 'VAR
    "while" 'WHILE))
 
-(define/match (token-types type)
-  ; One char
-  [('LEFT_PAREN) 'LEFT_PAREN]
-  [('RIGHT_PAREN) 'RIGHT_PAREN]
-  [('LEFT_BRACE) 'LEFT_BRACE]
-  [('RIGHT_BRACE) 'RIGHT_BRACE]
-  [('COMMA) 'COMMA]
-  [('DOT) 'DOT]
-  [('MINUS) 'MINUS]
-  [('PLUS) 'PLUS]
-  [('SEMICOLON) 'SEMICOLON]
-  [('SLASH) 'SLASH]
-  [('STAR) 'STAR]
-  ; One or two char
-  [('BANG) 'BANG]
-  [('BANG_EQUAL) 'BANG_EQUAL]
-  [('EQUAL) 'EQUAL]
-  [('EQUAL_EQUAL) 'EQUAL_EQUAL]
-  [('GREATER) 'GREATER]
-  [('GREATER_EQUAL) 'GREATER_EQUAL]
-  [('LESS) 'LESS]
-  [('LESS_EQUAL) 'LESS_EQUAL]
-  ; literals
-  [('IDENTIFIER) 'IDENTIFIER]
-  [('STRING) 'STRING]
-  [('NUMBER) 'NUMBER]
-  ; keywords
-  [('AND) 'AND]
-  [('CLASS) 'CLASS]
-  [('ELSE) 'ELSE]
-  [('FALSE) 'FALSE]
-  [('FUN) 'FUN]
-  [('FOR) 'FOR]
-  [('IF) 'IF]
-  [('NIL) 'NIL]
-  [('OR) 'OR]
-  [('PRINT) 'PRINT]
-  [('RETURN) 'RETURN]
-  [('SUPER) 'SUPER]
-  [('THIS) 'THIS]
-  [('TRUE) 'TRUE]
-  [('VAR) 'VAR]
-  [('WHILE) 'WHILE]
-  [('EOF) 'EOF]
-  [(_) (error "invalid token type")])
+(define LEFT_PAREN 'LEFT_PAREN)
+(define RIGHT_PAREN 'RIGHT_PAREN)
+(define LEFT_BRACE 'LEFT_BRACE)
+(define RIGHT_BRACE 'RIGHT_BRACE)
+(define COMMA 'COMMA)
+(define DOT 'DOT)
+(define MINUS 'MINUS)
+(define PLUS 'PLUS)
+(define SEMICOLON 'SEMICOLON)
+(define SLASH 'SLASH)
+(define STAR 'STAR)
+(define BANG 'BANG)
+(define BANG_EQUAL 'BANG_EQUAL)
+(define EQUAL 'EQUAL)
+(define EQUAL_EQUAL 'EQUAL_EQUAL)
+(define GREATER 'GREATER)
+(define GREATER_EQUAL 'GREATER_EQUAL)
+(define LESS 'LESS)
+(define LESS_EQUAL 'LESS_EQUAL)
+(define IDENTIFIER 'IDENTIFIER)
+(define STRING 'STRING)
+(define NUMBER 'NUMBER)
+(define AND 'AND)
+(define CLASS 'CLASS)
+(define ELSE 'ELSE)
+(define FALSE 'FALSE)
+(define FUN 'FUN)
+(define FOR 'FOR)
+(define IF 'IF)
+(define NIL 'NIL)
+(define OR 'OR)
+(define PRINT 'PRINT)
+(define RETURN 'RETURN)
+(define SUPER 'SUPER)
+(define THIS 'THIS)
+(define TRUE 'TRUE)
+(define VAR 'VAR)
+(define WHILE 'WHILE)
+(define EOF 'EOF)
