@@ -6,7 +6,7 @@
 (require racket/function)
 (require "utils/while.rkt")
 (require "token.rkt")
-(require "lox.rkt")
+(require "error.rkt")
 
 (struct scanner
   (source tokens start current line)
@@ -33,7 +33,7 @@
          (scan-token! s)) ; scan from current pos
   (define eof-token (make-token 'EOF "" (scanner-line s)))
   (set-scanner-tokens! s (cons eof-token (scanner-tokens s)))
-  (reverse (scanner-tokens s)))
+  (list->vector (reverse (scanner-tokens s))))
 
 (define (scan-token! s)
   (match (advance! s)
@@ -60,7 +60,7 @@
     [#\" (scan-string! s)] ; string literals
     [(? char-numeric?) (scan-number! s)] ; number literals
     [(? char-identifier-start?) (scan-identifier! s)] ; identifiers
-    [_ (report-error (scanner-line s) "" "Unexpected character.")]))
+    [_ (report-error (scanner-line s) "Unexpected character.")]))
 
 (define (at-end? s) 
   (>= (scanner-current s) 
@@ -103,7 +103,7 @@
          (advance! s))
   (cond
     [(at-end? s) 
-     (report-error (scanner-line s) "" "Unterminated string.")]
+     (report-error (scanner-line s) "Unterminated string.")]
     [else
      (advance! s) ; consume the closing "
      ; trim the surrounding quotes, add token

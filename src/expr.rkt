@@ -1,10 +1,9 @@
 #lang racket/base
 
-(provide 
-  (all-defined-out))
+(provide (all-defined-out))
 
-(struct expr ())
-(struct binary expr (left operator right))
-(struct grouping expr (expression))
-(struct literal expr (value))
-(struct unary expr (operator right))
+(struct expr () #:transparent)
+(struct binary expr (left operator right) #:transparent)
+(struct grouping expr (expression) #:transparent)
+(struct literal expr (value) #:transparent)
+(struct unary expr (operator right) #:transparent)

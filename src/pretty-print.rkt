@@ -5,6 +5,8 @@
 (require "expr.rkt")
 (require "token.rkt")
 
+(provide expr->string)
+
 (define (expr->string expr)
   (match expr
     [(struct binary (left op right)) 

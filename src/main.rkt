@@ -2,8 +2,10 @@
 
 (require racket/match)
 (require racket/file)
-(require "lox.rkt")
+(require "parser.rkt")
 (require "scanner.rkt")
+(require "error.rkt")
+(require "pretty-print.rkt")
 
 (define (main)
   (define args (current-command-line-arguments))
@@ -18,18 +20,20 @@
     (define line (read-line))
     (unless (zero? (string-length line))
       (run line)
-      (set-globals-had-error! g #f)
+      (set-had-error! #f)
       (loop))))
 
 (define (run-file filename)
   (run (file->string filename))
-  (when (globals-had-error g)
+  (when had-error
     (exit 65)))
 
 (define (run source)
   (define scanner (make-scanner source))
   (define tokens (scan-tokens! scanner))
-  (for-each println tokens))
+  (define parser (make-parser tokens))
+  (define expression (parse! parser))
+  (unless had-error
+    (displayln (expr->string expression))))
 
-(define g (globals))
 (main)
