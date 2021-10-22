@@ -4,6 +4,7 @@
 (require racket/file)
 (require "parser.rkt")
 (require "scanner.rkt")
+(require "interpreter.rkt")
 (require "error.rkt")
 (require "pretty-print.rkt")
 
@@ -25,8 +26,8 @@
 
 (define (run-file filename)
   (run (file->string filename))
-  (when had-error
-    (exit 65)))
+  (when had-error (exit 65))
+  (when had-runtime-error (exit 70)))
 
 (define (run source)
   (define scanner (make-scanner source))
@@ -34,6 +35,7 @@
   (define parser (make-parser tokens))
   (define expression (parse! parser))
   (unless had-error
-    (displayln (expr->string expression))))
+    (displayln (expr->string expression))
+    (interpret expression)))
 
 (main)

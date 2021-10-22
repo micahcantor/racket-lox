@@ -8,6 +8,11 @@
 
 (provide make-parser parse!)
 
+(define (parse! p)
+  (define (handle-parse-error e) null)
+  (with-handlers ([exn:parse-error? handle-parse-error])
+    (parse-expression p)))
+
 (struct parser (tokens [current #:mutable]) #:transparent)
 
 ; ([vector] -> parser)
@@ -17,11 +22,6 @@
 ; (parser -> void)
 (define (parser-next! p)
   (set-parser-current! p (add1 (parser-current p))))
-
-(define (parse! p)
-  (define (handle-parse-error e) null)
-  (with-handlers ([exn:parse-error? handle-parse-error])
-    (parse-expression p)))
 
 ; (parse-expression parser) -> token
 (define (parse-expression p)
