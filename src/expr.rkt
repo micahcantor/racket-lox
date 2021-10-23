@@ -7,3 +7,4 @@
 (struct grouping expr (expression) #:transparent)
 (struct literal expr (value) #:transparent)
 (struct unary expr (operator right) #:transparent)
+(struct variable expr (name) #:transparent)

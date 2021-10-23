@@ -4,66 +4,97 @@
 (require racket/string)
 (require racket/format)
 (require "expr.rkt")
+(require "stmt.rkt")
 (require "token.rkt")
+(require "error.rkt")
+(require "env.rkt")
 
-(provide (struct-out exn:runtime-error) interpret)
+(provide interpret make-interpreter)
 
-(define (interpret expr)
+(struct interpreter (env))
+
+(define (make-interpreter [env (make-environment)])
+  (interpreter env))
+
+(define (interpret i statements)
   (define (handle-runtime-error e) null)
   (with-handlers ([exn:runtime-error? handle-runtime-error])
-    (define value (evaluate expr))
-    (value->string value)))
+    (for ([statement statements])
+      (execute i statement))))
 
-(define (evaluate expr)
+(define (execute i stmt)
   (cond
-    [(literal? expr) (eval-literal expr)]
-    [(grouping? expr) (eval-grouping expr)]
-    [(unary? expr) (eval-unary expr)]
-    [(binary? expr) (eval-binary expr)]))
+    [(expression-stmt? stmt) (eval-expression-stmt i stmt)]
+    [(print-stmt? stmt) (eval-print-stmt i stmt)]
+    [(var-stmt? stmt) (eval-var-stmt i stmt)]))
 
-(define (eval-literal expr)
+(define (eval-expression-stmt i stmt)
+  (evaluate i (expression-stmt-expr stmt)))
+
+(define (eval-print-stmt i stmt)
+  (define value (evaluate i (print-stmt-value stmt)))
+  (displayln (value->string value)))
+
+(define (eval-var-stmt i stmt)
+  (match-define (var-stmt name initializer) stmt)
+  (define value (if initializer (evaluate i initializer) null))
+  (env-define (interpreter-env i) (token-lexeme name) value))
+
+(define (evaluate i expr)
+  (cond
+    [(literal? expr) (eval-literal i expr)]
+    [(variable? expr) (eval-variable-expression i expr)]
+    [(grouping? expr) (eval-grouping i expr)]
+    [(unary? expr) (eval-unary i expr)]
+    [(binary? expr) (eval-binary i expr)]))
+
+(define (eval-literal i expr)
   (literal-value expr))
 
-(define (eval-grouping expr)
-  (evaluate (grouping-expression expr)))
+(define (eval-variable-expression i expr)
+  (env-get (interpreter-env i) (variable-name expr)))
 
-(define (eval-unary expr)
-  (define right (evaluate (unary-right expr)))
-  (match (token-type (unary-operator expr))
-    [MINUS 
-     (check-number-operand right)
-     (- right)]
-    [BANG (not (truthy? right))]))
+(define (eval-grouping i expr)
+  (evaluate i (grouping-expression expr)))
 
-(define (eval-binary expr)
-  (match-define (binary operator l r) expr)
-  (define left (evaluate l))
-  (define right (evaluate r))
+(define (eval-unary i expr)
+  (match-define (unary operator r) expr)
+  (define right (evaluate i r))
   (match (token-type operator)
-    [BANG_EQUAL (not (lox-equal? left right))]
-    [EQUAL_EQUAL (lox-equal? left right)]
-    [GREATER
+    [(quote MINUS) 
+     (check-number-operand operator right)
+     (- right)]
+    [(quote BANG) (not (truthy? right))]))
+
+(define (eval-binary i expr)
+  (match-define (binary l operator r) expr)
+  (define left (evaluate i l))
+  (define right (evaluate i r))
+  (match (token-type operator)
+    [(quote BANG_EQUAL) (not (lox-equal? left right))]
+    [(quote EQUAL_EQUAL) (lox-equal? left right)]
+    [(quote GREATER)
      (check-number-operands operator left right) 
      (> left right)]
-    [GREATER_EQUAL 
+    [(quote GREATER_EQUAL) 
      (check-number-operands operator left right) 
      (>= left right)]
-    [LESS 
+    [(quote LESS) 
      (check-number-operands operator left right) 
      (< left right)]
-    [LESS_EQUAL 
+    [(quote LESS_EQUAL) 
      (check-number-operands operator left right) 
      (<= left right)]
-    [MINUS 
+    [(quote MINUS) 
      (check-number-operands operator left right) 
      (- left right)]
-    [SLASH 
+    [(quote SLASH) 
      (check-number-operands operator left right) 
      (/ left right)]
-    [STAR 
+    [(quote STAR) 
      (check-number-operands operator left right) 
      (* left right)]
-    [PLUS 
+    [(quote PLUS) 
      (cond
        [(and (string? left) (string? right))
         (string-append left right)]
@@ -72,7 +103,7 @@
        [else
         (raise-runtime-error operator "Operands must be two numbers or two strings.")])]))
 
-; lox evaluates only false and null to false
+; lox evaluates false and null literals to false
 (define (truthy? v)
   (and v (not (null? v))))
 
@@ -88,20 +119,12 @@
 
 (define (value->string v) 
   (cond
+    [(equal? v #t) "true"]
+    [(equal? v #f) "false"]
     [(null? v) "nil"]
     [(number? v)
      (define text (number->string v))
-     (if (string-suffix? ".0")
+     (if (string-suffix? text ".0")
          (substring text (- (string-length text) 2))
          text)]
     [else (~a v)]))
-
-#| Error Handling |#
-
-(struct exn:runtime-error exn:fail (token))
-
-(define (make-runtime-error token message)
-  (exn:runtime-error token message (current-continuation-marks)))
-
-(define (raise-runtime-error token message)
-  (raise (make-runtime-error token message)))

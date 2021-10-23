@@ -6,13 +6,12 @@
 (require "scanner.rkt")
 (require "interpreter.rkt")
 (require "error.rkt")
-(require "pretty-print.rkt")
 
 (define (main)
   (define args (current-command-line-arguments))
   (match args
-    [null (run-prompt)]
-    [(list f) (run-file f)]
+    [(vector) (run-prompt)]
+    [(vector f) (run-file f)]
     [_ (println "Usage: racket-lox [script]")]))
 
 (define (run-prompt)
@@ -33,9 +32,9 @@
   (define scanner (make-scanner source))
   (define tokens (scan-tokens! scanner))
   (define parser (make-parser tokens))
-  (define expression (parse! parser))
+  (define statements (parse! parser))
+  (define interpreter (make-interpreter))
   (unless had-error
-    (displayln (expr->string expression))
-    (interpret expression)))
+    (interpret interpreter statements)))
 
 (main)

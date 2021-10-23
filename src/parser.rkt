@@ -5,13 +5,17 @@
 (require "token.rkt")
 (require "expr.rkt")
 (require "error.rkt")
+(require "stmt.rkt")
 
 (provide make-parser parse!)
 
 (define (parse! p)
   (define (handle-parse-error e) null)
   (with-handlers ([exn:parse-error? handle-parse-error])
-    (parse-expression p)))
+    (define statements null)
+    (while (not (at-end? p))
+           (set! statements (cons (parse-declaration p) statements)))
+    (reverse statements)))
 
 (struct parser (tokens [current #:mutable]) #:transparent)
 
@@ -22,6 +26,36 @@
 ; (parser -> void)
 (define (parser-next! p)
   (set-parser-current! p (add1 (parser-current p))))
+
+(define (parse-declaration p)
+  (define (handle-parse-error e) (synchronize))
+  (with-handlers ([exn:parse-error? handle-parse-error])
+    (cond
+      [(matches? p VAR) (parse-var-declaration p)]
+      [else (parse-statement p)])))
+
+(define (parse-statement p)
+  (cond
+    [(matches? p PRINT) (parse-print-statement p)]
+    [else (parse-expression-statement p)]))
+
+(define (parse-print-statement p)
+  (define value (parse-expression p))
+  (consume! p SEMICOLON "Expect ';' after value.")
+  (print-stmt value))
+
+(define (parse-expression-statement p)
+  (define expr (parse-expression p))
+  (consume! p SEMICOLON "Expect ';' after expression.")
+  (expression-stmt expr))
+
+(define (parse-var-declaration p)
+  (define name (consume! p IDENTIFIER "Expect variable name."))
+  (define initializer #f)
+  (when (matches? p EQUAL)
+    (set! initializer (parse-expression p)))
+  (consume! p SEMICOLON "Expect ';' after variable declaration.")
+  (var-stmt name initializer))
 
 ; (parse-expression parser) -> token
 (define (parse-expression p)
@@ -67,9 +101,11 @@
      (literal null)]
     [(matches? p NUMBER STRING)
      (literal (token-literal (previous p)))]
+    [(matches? p IDENTIFIER)
+     (variable (previous p))]
     [(matches? p LEFT_PAREN)
      (define expr (parse-expression p)) ; parse the following expression
-     (consume p RIGHT_PAREN "Expect ')' after expression")
+     (consume! p RIGHT_PAREN "Expect ')' after expression")
      (grouping expr)]
     [else (raise-parse-error (peek p) "Expect expression")]))
 
@@ -90,7 +126,7 @@
         #f)))
 
 ; (consume parser token-typ string) -> void
-(define (consume p type message) 
+(define (consume! p type message) 
   (if (same-type? p type)
       (advance! p)
       (raise-parse-error (peek p) message)))
@@ -118,16 +154,6 @@
   (vector-ref (parser-tokens p) (sub1 (parser-current p))))
 
 #| Error Handling |#
-
-(struct exn:parse-error exn:fail ())
-
-(define (make-parse-error token message)
-  (lox-error token message) ; print error message and set had-error 
-  (exn:parse-error (lox-error-message (token-line token) message)
-                   (current-continuation-marks)))
-
-(define (raise-parse-error token message)
-  (raise (make-parse-error token message)))
 
 ; (synchronize parser) -> void
 ; Discard tokens until we're at the beginning of the next statement.
