@@ -6,6 +6,7 @@
 (provide (all-defined-out))
 
 #| Global error flags |#
+
 (define had-error #f)
 (define had-runtime-error #f)
 
@@ -16,6 +17,7 @@
   (set! had-runtime-error bool))
 
 #| Parse errors |#
+
 (struct exn:parse-error exn:fail ())
 
 (define (make-parse-error token message)
@@ -27,6 +29,7 @@
   (raise (make-parse-error token message)))
 
 #| Runtime errors |#
+
 (struct exn:runtime-error exn:fail (token))
 
 (define (make-runtime-error token message)
@@ -43,6 +46,7 @@
   (set-had-runtime-error! #t))
 
 #| Lox errors |#
+
 (define (lox-error t message)
   (match-define (token type lexeme _ line) t)
   (if (equal? type EOF)

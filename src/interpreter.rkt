@@ -22,6 +22,8 @@
     (for ([statement statements])
       (execute i statement))))
 
+#| Statements |#
+
 (define (execute i stmt)
   (cond
     [(expression-stmt? stmt) (eval-expression-stmt i stmt)]
@@ -39,6 +41,8 @@
   (match-define (var-stmt name initializer) stmt)
   (define value (if initializer (evaluate i initializer) null))
   (env-define (interpreter-env i) (token-lexeme name) value))
+
+#| Expressions |#
 
 (define (evaluate i expr)
   (cond
@@ -102,6 +106,8 @@
         (+ left right)]
        [else
         (raise-runtime-error operator "Operands must be two numbers or two strings.")])]))
+
+#| Helpers |#
 
 ; lox evaluates false and null literals to false
 (define (truthy? v)
