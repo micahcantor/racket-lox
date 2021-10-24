@@ -35,6 +35,6 @@
   (define statements (parse! parser))
   (define interpreter (make-interpreter))
   (unless had-error
-    (interpret interpreter statements)))
+    (interpret! interpreter statements)))
 
 (main)

@@ -3,7 +3,7 @@
 (require "error.rkt")
 (require "token.rkt")
 
-(provide make-environment env-define env-get)
+(provide make-environment env-define env-get env-assign)
 
 (struct env (values))
 
@@ -15,8 +15,11 @@
 
 (define (env-get e name)
   (define lexeme (token-lexeme name))
+  (define val (hash-ref (env-values e) lexeme #f))
+  (if val val (raise-undefined-variable-error name lexeme)))
+
+(define (env-assign e name value)
+  (define lexeme (token-lexeme name))
   (if (hash-has-key? (env-values e) lexeme)
-      (hash-ref (env-values e) lexeme)
-      (raise-runtime-error 
-       name 
-       (format "Undefined variable '~a'." lexeme))))
+      (env-define e lexeme value)
+      (raise-undefined-variable-error name lexeme)))

@@ -9,14 +9,14 @@
 (require "error.rkt")
 (require "env.rkt")
 
-(provide interpret make-interpreter)
+(provide interpret! make-interpreter)
 
 (struct interpreter (env))
 
 (define (make-interpreter [env (make-environment)])
   (interpreter env))
 
-(define (interpret i statements)
+(define (interpret! i statements)
   (define (handle-runtime-error e) null)
   (with-handlers ([exn:runtime-error? handle-runtime-error])
     (for ([statement statements])
@@ -48,6 +48,7 @@
   (cond
     [(literal? expr) (eval-literal i expr)]
     [(variable? expr) (eval-variable-expression i expr)]
+    [(assign? expr) (eval-assign i expr)]
     [(grouping? expr) (eval-grouping i expr)]
     [(unary? expr) (eval-unary i expr)]
     [(binary? expr) (eval-binary i expr)]))
@@ -57,6 +58,12 @@
 
 (define (eval-variable-expression i expr)
   (env-get (interpreter-env i) (variable-name expr)))
+
+(define (eval-assign i expr)
+  (match-define (assign name val) expr)
+  (define value (evaluate i val))
+  (env-assign (interpreter-env i) name value)
+  value) ; return the assigned value
 
 (define (eval-grouping i expr)
   (evaluate i (grouping-expression expr)))

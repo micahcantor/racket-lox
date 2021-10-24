@@ -45,18 +45,21 @@
            (exn:runtime-error-token e)))
   (set-had-runtime-error! #t))
 
+(define (raise-undefined-variable-error name lexeme)
+  (raise-runtime-error 
+   name (format "Undefined variable '~a'." lexeme)))
+
 #| Lox errors |#
 
 (define (lox-error t message)
   (match-define (token type lexeme _ line) t)
   (if (equal? type EOF)
       (report-error line "at end" message)
-      (report-error "at '" lexeme message)))
+      (report-error line (format "at '~a'" lexeme) message)))
 
 (define (report-error line message [where ""])
   (displayln (lox-error-message line where message))
   (set-had-error! #t))
-
 
 (define (lox-error-message line message [where ""])
   (format "[line ~a] Error ~a: ~a" line where message))

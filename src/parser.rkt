@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require srfi/26)
+(require racket/contract)
 (require "utils/while.rkt")
 (require "token.rkt")
 (require "expr.rkt")
@@ -12,10 +13,10 @@
 (define (parse! p)
   (define (handle-parse-error e) null)
   (with-handlers ([exn:parse-error? handle-parse-error])
-    (define statements null)
-    (while (not (at-end? p))
-           (set! statements (cons (parse-declaration p) statements)))
-    (reverse statements)))
+    (let loop ([statements null])
+      (if (at-end? p)
+          (reverse statements)
+          (loop (cons (parse-declaration p) statements))))))
 
 (struct parser (tokens [current #:mutable]) #:transparent)
 
@@ -27,12 +28,23 @@
 (define (parser-next! p)
   (set-parser-current! p (add1 (parser-current p))))
 
+#| Statement Parsing |#
+
 (define (parse-declaration p)
-  (define (handle-parse-error e) (synchronize))
+  ; synchronize after a parse error on a statement.
+  (define (handle-parse-error e) (synchronize p)) 
   (with-handlers ([exn:parse-error? handle-parse-error])
     (cond
       [(matches? p VAR) (parse-var-declaration p)]
       [else (parse-statement p)])))
+
+(define (parse-var-declaration p)
+  (define name (consume! p IDENTIFIER "Expect variable name."))
+  (define initializer #f)
+  (when (matches? p EQUAL)
+    (set! initializer (parse-expression p)))
+  (consume! p SEMICOLON "Expect ';' after variable declaration.")
+  (var-stmt name initializer))
 
 (define (parse-statement p)
   (cond
@@ -49,17 +61,28 @@
   (consume! p SEMICOLON "Expect ';' after expression.")
   (expression-stmt expr))
 
-(define (parse-var-declaration p)
-  (define name (consume! p IDENTIFIER "Expect variable name."))
-  (define initializer #f)
-  (when (matches? p EQUAL)
-    (set! initializer (parse-expression p)))
-  (consume! p SEMICOLON "Expect ';' after variable declaration.")
-  (var-stmt name initializer))
+#| Expression Parsing |#
 
 ; (parse-expression parser) -> token
 (define (parse-expression p)
-  (parse-equality p))
+  (parse-assignment p))
+
+; (parse-assignment parser) -> token
+; parses right-assosiative assignment expression.
+; report error if the left side of assignment is not a variable name.
+;   e.g: a = 2; // okay
+;        newPoint(x + 2, 0).y = 2; // okay
+;        a + b = 2; // not okay
+(define (parse-assignment p)
+  (define expr (parse-equality p))
+  (cond 
+    [(matches? p EQUAL)
+     (define equals (previous p))
+     (define value (parse-assignment p))
+     (if (variable? expr)
+         (assign (variable-name expr) value)
+         (make-parse-error equals "Invalid assignment target."))]
+    [else expr]))
 
 ; (parse-equality parser) -> token
 (define (parse-equality p)
@@ -110,6 +133,9 @@
     [else (raise-parse-error (peek p) "Expect expression")]))
 
 ; (left-assosiative-binary parser (parser -> token) (listof token-type)) -> token
+; First parse the left side, which can be any expression of higher precedence.
+; Then recursively parse the right side while the desire tokens match, setting
+; the final expression to the binary result of the two sides.
 (define (left-assosiative-binary p token-parser token-matches)
   (define expr (token-parser p))
   (while (apply (cut matches? p <...>) token-matches)
@@ -118,8 +144,11 @@
          (set! expr (binary expr operator right)))
   expr)
 
+#| Helpers |#
+
 ; (matches? parser . (listof token-type)) -> bool
-(define (matches? p . types)
+(define/contract (matches? p . types)
+  ((parser?) #:rest (listof symbol?) . ->* . (or/c token? boolean? void?))
   (for/or ([type types])
     (if (same-type? p type)
         (advance! p)
@@ -152,8 +181,6 @@
 ; (previous parser) -> token
 (define (previous p) 
   (vector-ref (parser-tokens p) (sub1 (parser-current p))))
-
-#| Error Handling |#
 
 ; (synchronize parser) -> void
 ; Discard tokens until we're at the beginning of the next statement.
