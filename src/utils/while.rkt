@@ -1,9 +1,10 @@
-#lang racket/base
+#lang typed/racket/base
 
-(provide while)
+(provide (all-defined-out))
 
 (define-syntax-rule (while pred ...)
-  (let loop ()
+  (let loop : Void ()
     (when pred
       ...
       (loop))))
+

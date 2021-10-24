@@ -1,15 +1,23 @@
-#lang racket/base
+#lang typed/racket/base
 
 (provide (struct-out token) (all-defined-out))
 
-(struct token
-  (type lexeme literal line)
+(define-type Lox-Literal (U String Number Boolean Null))
+
+(struct token ([type : Symbol] 
+               [lexeme : String] 
+               [literal : Lox-Literal] 
+               [line : Integer])
   #:mutable
   #:transparent)
 
-(define (make-token type lexeme [literal #f] [line 1])
+(define-type Token token)
+
+(: make-token (->* (Symbol String Integer) (Lox-Literal) Token))
+(define (make-token type lexeme line [literal null])
   (token type lexeme literal line))
 
+(: keywords (HashTable String Symbol))
 (define keywords
   (hash
    "and" 'AND

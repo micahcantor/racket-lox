@@ -1,4 +1,4 @@
-#lang racket/base
+#lang typed/racket/base
 
 (provide make-scanner scan-tokens!)
 
@@ -8,25 +8,36 @@
 (require "token.rkt")
 (require "error.rkt")
 
-(struct scanner
-  (source tokens start current line)
+(struct scanner ([source : String] 
+                 [tokens : (Listof Token)] 
+                 [start : Integer] 
+                 [current : Integer] 
+                 [line : Integer])
   #:mutable)
 
+(define-type (Scanner) scanner)
+
+(: make-scanner (->* () (String (Listof Token) Integer Integer Integer) scanner))
 (define (make-scanner [source ""] [tokens '()] [start 0] [current 0] [line 1])
   (scanner source tokens start current line))
 
+(: scanner-current-char (-> Scanner Char))
 (define (scanner-current-char s)
   (string-ref (scanner-source s) (scanner-current s)))
 
+(: scanner-next! (-> Scanner Void))
 (define (scanner-next! s)
   (set-scanner-current! s (add1 (scanner-current s))))
 
+(: scanner-next-line! (-> Scanner Void))
 (define (scanner-next-line! s)
   (set-scanner-line! s (add1 (scanner-line s))))
 
+(: scanner-substring (->* (Scanner) (Integer Integer) String))
 (define (scanner-substring s [start (scanner-start s)] [end (scanner-current s)])
   (substring (scanner-source s) start end))
 
+(: scan-tokens! (-> Scanner (Vectorof Token)))
 (define (scan-tokens! s)
   (while (not (at-end? s))
          (set-scanner-start! s (scanner-current s)) ; set start of the current scan to the current pos
@@ -35,6 +46,7 @@
   (set-scanner-tokens! s (cons eof-token (scanner-tokens s)))
   (list->vector (reverse (scanner-tokens s))))
 
+(: scan-token! (-> Scanner Void))
 (define (scan-token! s)
   (match (advance! s)
     [#\( (add-token! s LEFT_PAREN)]
@@ -62,40 +74,48 @@
     [(? char-identifier-start?) (scan-identifier! s)] ; identifiers
     [_ (report-error (scanner-line s) "Unexpected character.")]))
 
+(: at-end? (-> Scanner Boolean))
 (define (at-end? s) 
   (>= (scanner-current s) 
       (string-length (scanner-source s))))
 
+(: advance! (-> Scanner Char))
 (define (advance! s)
   (define current (scanner-current-char s))
   (scanner-next! s)
   current)
 
+(: peek (-> Scanner Char))
 (define (peek s)
   (if (at-end? s)
       #\nul
       (scanner-current-char s)))
 
+(: peek-next (-> Scanner Char))
 (define (peek-next s)
   (define next-pos (add1 (scanner-current s)))
   (if (>= next-pos (string-length (scanner-source s)))
       #\nul
       (string-ref (scanner-source s) next-pos)))
 
+(: next-is? (-> Scanner Char Boolean))
 (define (next-is? s ch)
   (char=? (peek s) ch))
 
+(: matches? (-> Scanner Char Boolean))
 (define (matches? s expected)
   (and (not (at-end? s))
        (char=? (scanner-current-char s) expected)
        (scanner-next! s)
        #t))
 
-(define (add-token! s type [literal #f])
+(: add-token! (->* (Scanner Symbol) (Lox-Literal) Void))
+(define (add-token! s type [literal null])
   (define text (scanner-substring s))
-  (define new-token (make-token type text literal (scanner-line s)))
+  (define new-token (make-token type text (scanner-line s) literal))
   (set-scanner-tokens! s (cons new-token (scanner-tokens s))))
 
+(: scan-string! (-> Scanner Void))
 (define (scan-string! s)
   (while (and (not (next-is? s #\")) (not (at-end? s)))
          (when (next-is? s #\newline)
@@ -110,20 +130,25 @@
      (define value (scanner-substring s (add1 (scanner-start s)) (sub1 (scanner-current s))))
      (add-token! s  STRING value)]))
 
+(: scan-number! (-> Scanner Void))
 (define (scan-number! s)
   (while (char-numeric? (peek s)) (advance! s))
   ; look for fractional part
   (when (and (next-is? s #\.) (char-numeric? (peek-next s)))
     (advance! s) ; consume the "."
     (while (char-numeric? (peek s)) (advance! s)))
-  (add-token! s NUMBER (string->number (scanner-substring s))))
+  (define text (assert (scanner-substring s) string?))
+  (add-token! s NUMBER (string->number text)))
 
+(: char-identifier-start? (-> Char Boolean))
 (define (char-identifier-start? ch)
   (or (char-alphabetic? ch) (char=? ch #\_)))
 
-(define char-alphanumeric?
-  (disjoin char-identifier-start? char-numeric?))
+(: char-alphanumeric? (-> Char Boolean))
+(define (char-alphanumeric? ch)
+  (or (char-identifier-start? ch) (char-numeric? ch)))
 
+(: scan-identifier! (-> Scanner Void))
 (define (scan-identifier! s)
   (while (char-alphanumeric? (peek s))
          (advance! s))

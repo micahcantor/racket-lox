@@ -1,7 +1,6 @@
-#lang racket/base
+#lang typed/racket/base
 
-(require srfi/26)
-(require racket/contract)
+(require racket/function)
 (require "utils/while.rkt")
 (require "token.rkt")
 (require "expr.rkt")
@@ -10,52 +9,66 @@
 
 (provide make-parser parse!)
 
+(: parse! (-> Parser (Listof (Option Stmt))))
 (define (parse! p)
   (define (handle-parse-error e) null)
   (with-handlers ([exn:parse-error? handle-parse-error])
-    (let loop ([statements null])
-      (if (at-end? p)
-          (reverse statements)
-          (loop (cons (parse-declaration p) statements))))))
+    (: statements (Listof (Option Stmt)))
+    (define statements null)
+    (while (not (at-end? p))
+           (set! statements (cons (parse-declaration p) statements)))
+    (reverse statements)))
 
-(struct parser (tokens [current #:mutable]) #:transparent)
+(struct parser ([tokens : (Vectorof Token)] 
+                [current : Integer]) 
+  #:mutable #:transparent)
 
-; ([vector] -> parser)
+(define-type Parser parser)
+
+(: make-parser (-> (Vectorof Token) Parser))
 (define (make-parser [tokens (vector)])
   (parser tokens 0))
 
-; (parser -> void)
+(: parser-next! (-> Parser Void))
 (define (parser-next! p)
   (set-parser-current! p (add1 (parser-current p))))
 
 #| Statement Parsing |#
 
+(: parse-declaration (-> Parser (Option Stmt)))
 (define (parse-declaration p)
   ; synchronize after a parse error on a statement.
-  (define (handle-parse-error e) (synchronize p)) 
+  (define (handle-parse-error e) 
+    (synchronize p)
+    #f) 
   (with-handlers ([exn:parse-error? handle-parse-error])
     (cond
       [(matches? p VAR) (parse-var-declaration p)]
       [else (parse-statement p)])))
 
+(: parse-var-declaration (-> Parser Stmt))
 (define (parse-var-declaration p)
   (define name (consume! p IDENTIFIER "Expect variable name."))
+  (: initializer (Option Expr))
   (define initializer #f)
   (when (matches? p EQUAL)
     (set! initializer (parse-expression p)))
   (consume! p SEMICOLON "Expect ';' after variable declaration.")
   (var-stmt name initializer))
 
+(: parse-statement (-> Parser Stmt))
 (define (parse-statement p)
   (cond
     [(matches? p PRINT) (parse-print-statement p)]
     [else (parse-expression-statement p)]))
 
+(: parse-print-statement (-> Parser Stmt))
 (define (parse-print-statement p)
   (define value (parse-expression p))
   (consume! p SEMICOLON "Expect ';' after value.")
   (print-stmt value))
 
+(: parse-expression-statement (-> Parser Stmt))
 (define (parse-expression-statement p)
   (define expr (parse-expression p))
   (consume! p SEMICOLON "Expect ';' after expression.")
@@ -63,48 +76,49 @@
 
 #| Expression Parsing |#
 
-; (parse-expression parser) -> token
+(: parse-expression (-> Parser Expr))
 (define (parse-expression p)
   (parse-assignment p))
 
-; (parse-assignment parser) -> token
 ; parses right-assosiative assignment expression.
 ; report error if the left side of assignment is not a variable name.
 ;   e.g: a = 2; // okay
 ;        newPoint(x + 2, 0).y = 2; // okay
 ;        a + b = 2; // not okay
+(: parse-assignment (-> Parser Expr))
 (define (parse-assignment p)
   (define expr (parse-equality p))
   (cond 
     [(matches? p EQUAL)
      (define equals (previous p))
      (define value (parse-assignment p))
-     (if (variable? expr)
-         (assign (variable-name expr) value)
-         (make-parse-error equals "Invalid assignment target."))]
+     (unless (variable? expr)
+       (lox-error equals "Invalid assignment target."))
+     (assert expr variable?)
+     (assign (variable-name expr) value)]
     [else expr]))
 
-; (parse-equality parser) -> token
+(: parse-equality (-> Parser Expr))
 (define (parse-equality p)
   (define token-matches (list BANG_EQUAL EQUAL_EQUAL))
   (left-assosiative-binary p parse-comparison token-matches))
 
-; (parse-comparison parser) -> token
+(: parse-comparison (-> Parser Expr))
 (define (parse-comparison p)
   (define token-matches (list GREATER GREATER_EQUAL LESS LESS_EQUAL))
   (left-assosiative-binary p parse-term token-matches))
 
-; (parse-term parser) -> token
+(: parse-term (-> Parser Expr))
 (define (parse-term p)
   (define token-matches (list MINUS PLUS))
   (left-assosiative-binary p parse-factor token-matches))
 
-; (parse-factor parser) -> token
+(: parse-factor (-> Parser Expr))
 (define (parse-factor p)
   (define token-matches (list SLASH STAR))
   (left-assosiative-binary p parse-unary token-matches))
 
-; (parse-unary parser -> token)
+(: parse-unary (-> Parser Expr))
 (define (parse-unary p)
   (cond
     [(matches? p BANG MINUS)
@@ -113,7 +127,7 @@
      (unary operator right)]
     [else (parse-primary p)]))
 
-; (parse-primary parser) -> token
+(: parse-primary (-> Parser Expr))
 (define (parse-primary p)
   (cond
     [(matches? p FALSE)
@@ -130,15 +144,18 @@
      (define expr (parse-expression p)) ; parse the following expression
      (consume! p RIGHT_PAREN "Expect ')' after expression")
      (grouping expr)]
-    [else (raise-parse-error (peek p) "Expect expression")]))
+    [else 
+      (raise-parse-error (peek p) "Expect expression")
+      (expr)]))
 
-; (left-assosiative-binary parser (parser -> token) (listof token-type)) -> token
+; (left-assosiative-binary parser (parser -> token) (listof Token-type)) -> token
 ; First parse the left side, which can be any expression of higher precedence.
 ; Then recursively parse the right side while the desire tokens match, setting
 ; the final expression to the binary result of the two sides.
+(: left-assosiative-binary (-> Parser (-> Parser Expr) (Listof Symbol) Expr))
 (define (left-assosiative-binary p token-parser token-matches)
   (define expr (token-parser p))
-  (while (apply (cut matches? p <...>) token-matches)
+  (while (apply ((curry matches?) p) token-matches)
          (define operator (previous p))
          (define right (token-parser p))
          (set! expr (binary expr operator right)))
@@ -146,39 +163,38 @@
 
 #| Helpers |#
 
-; (matches? parser . (listof token-type)) -> bool
-(define/contract (matches? p . types)
-  ((parser?) #:rest (listof symbol?) . ->* . (or/c token? boolean? void?))
+(: matches? (-> Parser Symbol * (Option Token)))
+(define (matches? p . types)
   (for/or ([type types])
     (if (same-type? p type)
         (advance! p)
         #f)))
 
-; (consume parser token-typ string) -> void
-(define (consume! p type message) 
-  (if (same-type? p type)
-      (advance! p)
-      (raise-parse-error (peek p) message)))
+(: consume! (-> Parser Symbol String Token))
+(define (consume! p type message)
+  (unless (same-type? p type)
+    (raise-parse-error (peek p) message))
+  (advance! p))
 
-; (same-type? parser token-type) -> bool
+(: same-type? (-> Parser Symbol Boolean))
 (define (same-type? p type)
   (and (not (at-end? p))
        (equal? (token-type (peek p)) type)))
 
-; (advance! parser) -> token | void
+(: advance! (-> Parser Token))
 (define (advance! p)
   (unless (at-end? p) (parser-next! p))
   (previous p))
 
-; (at-end? parser) -> bool
+(: at-end? (-> Parser Boolean))
 (define (at-end? p)
   (equal? (token-type (peek p)) EOF))
 
-; (peek parser) -> token
+(: peek (-> Parser Token))
 (define (peek p)
   (vector-ref (parser-tokens p) (parser-current p)))
 
-; (previous parser) -> token
+(: previous (-> Parser Token))
 (define (previous p) 
   (vector-ref (parser-tokens p) (sub1 (parser-current p))))
 
@@ -186,6 +202,7 @@
 ; Discard tokens until we're at the beginning of the next statement.
 ; After a semicolon, we are probably finished with a statement.
 ; When the next token is a keyword, we are probably beginning a statement.
+(: synchronize (-> Parser Void))
 (define (synchronize p)
   (advance! p)
   (define keywords (list CLASS FUN VAR FOR IF WHILE PRINT RETURN))

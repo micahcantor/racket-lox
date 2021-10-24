@@ -1,4 +1,4 @@
-#lang racket/base
+#lang typed/racket/base
 
 (require racket/match)
 (require racket/string)
@@ -11,32 +11,40 @@
 
 (provide interpret! make-interpreter)
 
-(struct interpreter (env))
+(struct interpreter ([env : Env]))
+(define-type Interpreter interpreter)
 
+(: make-interpreter (->* () (Env) Interpreter))
 (define (make-interpreter [env (make-environment)])
   (interpreter env))
 
+(: interpret! (-> Interpreter (Listof Stmt) Void))
 (define (interpret! i statements)
-  (define (handle-runtime-error e) null)
+  (define (handle-runtime-error e) (void))
   (with-handlers ([exn:runtime-error? handle-runtime-error])
     (for ([statement statements])
       (execute i statement))))
 
 #| Statements |#
 
+(: execute (-> Interpreter Stmt Void))
 (define (execute i stmt)
   (cond
     [(expression-stmt? stmt) (eval-expression-stmt i stmt)]
     [(print-stmt? stmt) (eval-print-stmt i stmt)]
     [(var-stmt? stmt) (eval-var-stmt i stmt)]))
 
+(: eval-expression-stmt (-> Interpreter ExpressionStmt Void))
 (define (eval-expression-stmt i stmt)
-  (evaluate i (expression-stmt-expr stmt)))
+  (evaluate i (expression-stmt-expr stmt))
+  (void))
 
+(: eval-print-stmt (-> Interpreter PrintStmt Void))
 (define (eval-print-stmt i stmt)
   (define value (evaluate i (print-stmt-value stmt)))
   (displayln (value->string value)))
 
+(: eval-var-stmt (-> Interpreter VarStmt Void))
 (define (eval-var-stmt i stmt)
   (match-define (var-stmt name initializer) stmt)
   (define value (if initializer (evaluate i initializer) null))
@@ -44,6 +52,7 @@
 
 #| Expressions |#
 
+(: evaluate (-> Interpreter Expr Any))
 (define (evaluate i expr)
   (cond
     [(literal? expr) (eval-literal i expr)]
@@ -53,21 +62,26 @@
     [(unary? expr) (eval-unary i expr)]
     [(binary? expr) (eval-binary i expr)]))
 
+(: eval-literal (-> Interpreter LiteralExpr Any))
 (define (eval-literal i expr)
   (literal-value expr))
 
+(: eval-variable-expression (-> Interpreter VariableExpr Any))
 (define (eval-variable-expression i expr)
   (env-get (interpreter-env i) (variable-name expr)))
 
+(: eval-assign (-> Interpreter AssignExpr Any))
 (define (eval-assign i expr)
   (match-define (assign name val) expr)
   (define value (evaluate i val))
   (env-assign (interpreter-env i) name value)
   value) ; return the assigned value
 
+(: eval-grouping (-> Interpreter GroupingExpr Any))
 (define (eval-grouping i expr)
   (evaluate i (grouping-expression expr)))
 
+(: eval-unary (-> Interpreter UnaryExpr Any))
 (define (eval-unary i expr)
   (match-define (unary operator r) expr)
   (define right (evaluate i r))
@@ -77,6 +91,7 @@
      (- right)]
     [(quote BANG) (not (truthy? right))]))
 
+(: eval-binary (-> Interpreter BinaryExpr Any))
 (define (eval-binary i expr)
   (match-define (binary l operator r) expr)
   (define left (evaluate i l))
@@ -117,19 +132,26 @@
 #| Helpers |#
 
 ; lox evaluates false and null literals to false
+(: truthy? (-> Any Boolean))
 (define (truthy? v)
   (and v (not (null? v))))
 
 (define lox-equal? equal?)
 
-(define (check-number-operand operator operand)
-  (unless (number? operand)
-    (raise-runtime-error operator "Operand must be a number.")))
+(define-syntax-rule (check-number-operand operator operand)
+  (begin
+    (unless (number? operand)
+      (raise-runtime-error operator "Operand must be a number."))
+    (assert operand number?)))
 
-(define (check-number-operands operator left right)
-  (unless (and (number? left) (number? right))
-    (raise-runtime-error operator "Operands must be numbers.")))
+(define-syntax-rule (check-number-operands operator left right)
+  (begin
+    (unless (and (real? left) (real? right))
+      (raise-runtime-error operator "Operands must be numbers."))
+    (assert left real?)
+    (assert right real?)))
 
+(: value->string (-> Any String))
 (define (value->string v) 
   (cond
     [(equal? v #t) "true"]

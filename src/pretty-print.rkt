@@ -25,8 +25,8 @@
 
 (define (test)
   (define expression
-    (binary (unary (make-token MINUS "-")
+    (binary (unary (make-token MINUS "-" 1)
                    (literal 123))
-            (make-token STAR "*")
+            (make-token STAR "*" 1)
             (grouping (literal 45.67))))
   (displayln (expr->string expression)))
