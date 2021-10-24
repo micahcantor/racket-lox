@@ -9,11 +9,11 @@
 
 (provide make-parser parse!)
 
-(: parse! (-> Parser (Listof (Option Stmt))))
+(: parse! (-> Parser (Listof Stmt)))
 (define (parse! p)
   (define (handle-parse-error e) null)
   (with-handlers ([exn:parse-error? handle-parse-error])
-    (: statements (Listof (Option Stmt)))
+    (: statements (Listof Stmt))
     (define statements null)
     (while (not (at-end? p))
            (set! statements (cons (parse-declaration p) statements)))
@@ -35,12 +35,10 @@
 
 #| Statement Parsing |#
 
-(: parse-declaration (-> Parser (Option Stmt)))
+(: parse-declaration (-> Parser Stmt))
 (define (parse-declaration p)
   ; synchronize after a parse error on a statement.
-  (define (handle-parse-error e) 
-    (synchronize p)
-    #f) 
+  (define (handle-parse-error e) (synchronize p) (stmt)) 
   (with-handlers ([exn:parse-error? handle-parse-error])
     (cond
       [(matches? p VAR) (parse-var-declaration p)]
@@ -60,6 +58,7 @@
 (define (parse-statement p)
   (cond
     [(matches? p PRINT) (parse-print-statement p)]
+    [(matches? p LEFT_BRACE) (parse-block-statement p)]
     [else (parse-expression-statement p)]))
 
 (: parse-print-statement (-> Parser Stmt))
@@ -67,6 +66,15 @@
   (define value (parse-expression p))
   (consume! p SEMICOLON "Expect ';' after value.")
   (print-stmt value))
+
+(: parse-block-statement (-> Parser BlockStmt))
+(define (parse-block-statement p)
+  (: stmts (Listof Stmt))
+  (define stmts null)
+  (while (and (not (same-type? p RIGHT_BRACE)) (not (at-end? p)))
+    (set! stmts (cons (parse-declaration p) stmts)))
+  (consume! p RIGHT_BRACE "Expect '}' after block.")
+  (block-stmt (reverse stmts)))
 
 (: parse-expression-statement (-> Parser Stmt))
 (define (parse-expression-statement p)

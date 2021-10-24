@@ -11,7 +11,7 @@
 
 (provide interpret! make-interpreter)
 
-(struct interpreter ([env : Env]))
+(struct interpreter ([env : Env]) #:mutable)
 (define-type Interpreter interpreter)
 
 (: make-interpreter (->* () (Env) Interpreter))
@@ -30,22 +30,33 @@
 (: execute (-> Interpreter Stmt Void))
 (define (execute i stmt)
   (cond
-    [(expression-stmt? stmt) (eval-expression-stmt i stmt)]
-    [(print-stmt? stmt) (eval-print-stmt i stmt)]
-    [(var-stmt? stmt) (eval-var-stmt i stmt)]))
+    [(expression-stmt? stmt) (exec-expression-stmt i stmt)]
+    [(print-stmt? stmt) (exec-print-stmt i stmt)]
+    [(block-stmt? stmt) (exec-block-stmt i stmt)]
+    [(var-stmt? stmt) (exec-var-stmt i stmt)]))
 
-(: eval-expression-stmt (-> Interpreter ExpressionStmt Void))
-(define (eval-expression-stmt i stmt)
+(: exec-expression-stmt (-> Interpreter ExpressionStmt Void))
+(define (exec-expression-stmt i stmt)
   (evaluate i (expression-stmt-expr stmt))
   (void))
 
-(: eval-print-stmt (-> Interpreter PrintStmt Void))
-(define (eval-print-stmt i stmt)
+(: exec-print-stmt (-> Interpreter PrintStmt Void))
+(define (exec-print-stmt i stmt)
   (define value (evaluate i (print-stmt-value stmt)))
   (displayln (value->string value)))
 
-(: eval-var-stmt (-> Interpreter VarStmt Void))
-(define (eval-var-stmt i stmt)
+(: exec-block-stmt (-> Interpreter BlockStmt Void))
+(define (exec-block-stmt i stmt)
+  (define statements (block-stmt-statements stmt))
+  (define block-env (make-environment (interpreter-env i)))
+  (define previous (interpreter-env i))
+  (set-interpreter-env! i block-env)
+  (for ([statement statements])
+    (execute i statement))
+  (set-interpreter-env! i previous))
+
+(: exec-var-stmt (-> Interpreter VarStmt Void))
+(define (exec-var-stmt i stmt)
   (match-define (var-stmt name initializer) stmt)
   (define value (if initializer (evaluate i initializer) null))
   (env-define (interpreter-env i) (token-lexeme name) value))
@@ -86,7 +97,7 @@
   (match-define (unary operator r) expr)
   (define right (evaluate i r))
   (match (token-type operator)
-    [(quote MINUS) 
+    [(quote MINUS)
      (check-number-operand operator right)
      (- right)]
     [(quote BANG) (not (truthy? right))]))
@@ -100,27 +111,27 @@
     [(quote BANG_EQUAL) (not (lox-equal? left right))]
     [(quote EQUAL_EQUAL) (lox-equal? left right)]
     [(quote GREATER)
-     (check-number-operands operator left right) 
+     (check-number-operands operator left right)
      (> left right)]
-    [(quote GREATER_EQUAL) 
-     (check-number-operands operator left right) 
+    [(quote GREATER_EQUAL)
+     (check-number-operands operator left right)
      (>= left right)]
-    [(quote LESS) 
-     (check-number-operands operator left right) 
+    [(quote LESS)
+     (check-number-operands operator left right)
      (< left right)]
-    [(quote LESS_EQUAL) 
-     (check-number-operands operator left right) 
+    [(quote LESS_EQUAL)
+     (check-number-operands operator left right)
      (<= left right)]
-    [(quote MINUS) 
-     (check-number-operands operator left right) 
+    [(quote MINUS)
+     (check-number-operands operator left right)
      (- left right)]
-    [(quote SLASH) 
-     (check-number-operands operator left right) 
+    [(quote SLASH)
+     (check-number-operands operator left right)
      (/ left right)]
-    [(quote STAR) 
-     (check-number-operands operator left right) 
+    [(quote STAR)
+     (check-number-operands operator left right)
      (* left right)]
-    [(quote PLUS) 
+    [(quote PLUS)
      (cond
        [(and (string? left) (string? right))
         (string-append left right)]
@@ -152,7 +163,7 @@
     (assert right real?)))
 
 (: value->string (-> Any String))
-(define (value->string v) 
+(define (value->string v)
   (cond
     [(equal? v #t) "true"]
     [(equal? v #f) "false"]

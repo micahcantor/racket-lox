@@ -28,7 +28,8 @@
 
 (: run-file (-> Path-String Void))
 (define (run-file filename)
-  (run (file->string filename))
+  (define source (file->string filename))
+  (run source)
   (when had-error (exit 65))
   (when had-runtime-error (exit 70)))
 
@@ -40,6 +41,6 @@
   (define statements (parse! parser))
   (define interpreter (make-interpreter))
   (unless had-error
-    (interpret! interpreter (cast statements (Listof Stmt)))))
+    (interpret! interpreter statements)))
 
 (main)

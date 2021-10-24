@@ -4,14 +4,17 @@
 (require "token.rkt")
 (provide (all-defined-out))
 
-(struct stmt ())
+(struct stmt () #:transparent)
 (define-type Stmt stmt)
 
-(struct print-stmt stmt ([value : Expr]))
+(struct print-stmt stmt ([value : Expr]) #:transparent)
 (define-type PrintStmt print-stmt)
 
-(struct expression-stmt stmt ([expr : Expr]))
+(struct expression-stmt stmt ([expr : Expr]) #:transparent)
 (define-type ExpressionStmt expression-stmt)
 
-(struct var-stmt stmt ([name : Token] [initializer : (Option Expr)]))
+(struct var-stmt stmt ([name : Token] [initializer : (Option Expr)]) #:transparent)
 (define-type VarStmt var-stmt)
+
+(struct block-stmt stmt ([statements : (Listof Stmt)]) #:transparent)
+(define-type BlockStmt block-stmt)
