@@ -7,6 +7,7 @@
 (require "interpreter.rkt")
 (require "error.rkt")
 (require "stmt.rkt")
+(require "pretty-print.rkt")
 
 (: main (-> Void))
 (define (main)

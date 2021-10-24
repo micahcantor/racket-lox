@@ -18,3 +18,12 @@
 
 (struct block-stmt stmt ([statements : (Listof Stmt)]) #:transparent)
 (define-type BlockStmt block-stmt)
+
+(struct if-stmt stmt ([condition : Expr]
+                      [consequent : Stmt]
+                      [alternate : (Option Stmt)])
+  #:transparent)
+(define-type IfStmt if-stmt)
+
+(struct while-stmt stmt ([condition : Expr] [body : Stmt]) #:transparent)
+(define-type WhileStmt while-stmt)

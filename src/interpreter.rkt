@@ -8,6 +8,7 @@
 (require "token.rkt")
 (require "error.rkt")
 (require "env.rkt")
+(require "utils/while.rkt")
 
 (provide interpret! make-interpreter)
 
@@ -15,7 +16,7 @@
 (define-type Interpreter interpreter)
 
 (: make-interpreter (->* () (Env) Interpreter))
-(define (make-interpreter [env (make-environment)])
+(define (make-interpreter [env (make-env)])
   (interpreter env))
 
 (: interpret! (-> Interpreter (Listof Stmt) Void))
@@ -33,6 +34,8 @@
     [(expression-stmt? stmt) (exec-expression-stmt i stmt)]
     [(print-stmt? stmt) (exec-print-stmt i stmt)]
     [(block-stmt? stmt) (exec-block-stmt i stmt)]
+    [(if-stmt? stmt) (exec-if-stmt i stmt)]
+    [(while-stmt? stmt) (exec-while-stmt i stmt)]
     [(var-stmt? stmt) (exec-var-stmt i stmt)]))
 
 (: exec-expression-stmt (-> Interpreter ExpressionStmt Void))
@@ -48,12 +51,25 @@
 (: exec-block-stmt (-> Interpreter BlockStmt Void))
 (define (exec-block-stmt i stmt)
   (define statements (block-stmt-statements stmt))
-  (define block-env (make-environment (interpreter-env i)))
+  (define block-env (make-env (interpreter-env i)))
   (define previous (interpreter-env i))
   (set-interpreter-env! i block-env)
   (for ([statement statements])
     (execute i statement))
   (set-interpreter-env! i previous))
+
+(: exec-if-stmt (-> Interpreter IfStmt Void))
+(define (exec-if-stmt i stmt)
+  (match-define (if-stmt condition consequent alternate) stmt)
+  (cond
+    [(truthy? (evaluate i condition)) (execute i consequent)]
+    [alternate (execute i alternate)]))
+
+(: exec-while-stmt (-> Interpreter WhileStmt Void))
+(define (exec-while-stmt i stmt)
+  (match-define (while-stmt condition body) stmt)
+  (while (truthy? (evaluate i condition))
+         (execute i body)))
 
 (: exec-var-stmt (-> Interpreter VarStmt Void))
 (define (exec-var-stmt i stmt)
@@ -108,7 +124,12 @@
   (define left (evaluate i l))
   (define right (evaluate i r))
   (match (token-type operator)
-    [(quote BANG_EQUAL) (not (lox-equal? left right))]
+    [(quote OR)
+     (if (truthy? left) left right)]
+    [(quote AND)
+     (if (truthy? left) right left)]
+    [(quote BANG_EQUAL)
+     (not (lox-equal? left right))]
     [(quote EQUAL_EQUAL) (lox-equal? left right)]
     [(quote GREATER)
      (check-number-operands operator left right)
@@ -149,12 +170,14 @@
 
 (define lox-equal? equal?)
 
+; raises error if operand is not number, then asserts the predicate.
 (define-syntax-rule (check-number-operand operator operand)
   (begin
     (unless (number? operand)
       (raise-runtime-error operator "Operand must be a number."))
     (assert operand number?)))
 
+; raises error if operands are not numbers, then asserts the predicates.
 (define-syntax-rule (check-number-operands operator left right)
   (begin
     (unless (and (real? left) (real? right))

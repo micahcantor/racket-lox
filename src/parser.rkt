@@ -19,8 +19,8 @@
            (set! statements (cons (parse-declaration p) statements)))
     (reverse statements)))
 
-(struct parser ([tokens : (Vectorof Token)] 
-                [current : Integer]) 
+(struct parser ([tokens : (Vectorof Token)]
+                [current : Integer])
   #:mutable #:transparent)
 
 (define-type Parser parser)
@@ -38,7 +38,7 @@
 (: parse-declaration (-> Parser Stmt))
 (define (parse-declaration p)
   ; synchronize after a parse error on a statement.
-  (define (handle-parse-error e) (synchronize p) (stmt)) 
+  (define (handle-parse-error e) (synchronize p) (stmt))
   (with-handlers ([exn:parse-error? handle-parse-error])
     (cond
       [(matches? p VAR) (parse-var-declaration p)]
@@ -59,9 +59,12 @@
   (cond
     [(matches? p PRINT) (parse-print-statement p)]
     [(matches? p LEFT_BRACE) (parse-block-statement p)]
+    [(matches? p IF) (parse-if-statement p)]
+    [(matches? p WHILE) (parse-while-statement p)]
+    [(matches? p FOR) (parse-for-statement p)]
     [else (parse-expression-statement p)]))
 
-(: parse-print-statement (-> Parser Stmt))
+(: parse-print-statement (-> Parser PrintStmt))
 (define (parse-print-statement p)
   (define value (parse-expression p))
   (consume! p SEMICOLON "Expect ';' after value.")
@@ -71,12 +74,59 @@
 (define (parse-block-statement p)
   (: stmts (Listof Stmt))
   (define stmts null)
-  (while (and (not (same-type? p RIGHT_BRACE)) (not (at-end? p)))
-    (set! stmts (cons (parse-declaration p) stmts)))
+  (while (and (not (check? p RIGHT_BRACE)) (not (at-end? p)))
+         (set! stmts (cons (parse-declaration p) stmts)))
   (consume! p RIGHT_BRACE "Expect '}' after block.")
   (block-stmt (reverse stmts)))
 
-(: parse-expression-statement (-> Parser Stmt))
+(: parse-if-statement (-> Parser IfStmt))
+(define (parse-if-statement p)
+  (consume! p LEFT_PAREN "Expect '(' after 'if'.")
+  (define condition (parse-expression p))
+  (consume! p RIGHT_PAREN "Expect ')' after if condition.")
+  (define consequent (parse-statement p))
+  (define alternate
+    (and (matches? p ELSE) (parse-statement p)))
+  (if-stmt condition consequent alternate))
+
+(: parse-while-statement (-> Parser WhileStmt))
+(define (parse-while-statement p)
+  (consume! p LEFT_PAREN "Expect '(' after 'while'.")
+  (define condition (parse-expression p))
+  (consume! p RIGHT_PAREN "Expect ')' after 'while' condition.")
+  (define body (parse-statement p))
+  (while-stmt condition body))
+
+(: parse-for-statement (-> Parser Stmt))
+(define (parse-for-statement p)
+  (consume! p LEFT_PAREN "Expect '(' after 'for'.")
+  (define initializer
+    (cond
+      [(matches? p SEMICOLON) #f]
+      [(matches? p VAR) (parse-var-declaration p)]
+      [else (parse-expression-statement p)]))
+  (define condition
+    (if (check? p SEMICOLON)
+        (literal #t)
+        (parse-expression p)))
+  (consume! p SEMICOLON "Expect ';' after loop condition.")
+  (define increment
+    (if (check? p RIGHT_PAREN) #f (parse-expression p)))
+  (consume! p RIGHT_PAREN "Expect ')' after clauses.")
+  (define body (parse-statement p))
+  (desugar-for initializer condition increment body))
+
+(: desugar-for (-> (Option Stmt) Expr (Option Expr) Stmt Stmt))
+(define (desugar-for initializer condition increment body)
+  (when increment
+    (set! body
+          (block-stmt (list body (expression-stmt increment)))))
+  (set! body (while-stmt condition body))
+  (when initializer
+    (set! body (block-stmt (list initializer body))))
+  body)
+
+(: parse-expression-statement (-> Parser ExpressionStmt))
 (define (parse-expression-statement p)
   (define expr (parse-expression p))
   (consume! p SEMICOLON "Expect ';' after expression.")
@@ -95,8 +145,8 @@
 ;        a + b = 2; // not okay
 (: parse-assignment (-> Parser Expr))
 (define (parse-assignment p)
-  (define expr (parse-equality p))
-  (cond 
+  (define expr (parse-or p))
+  (cond
     [(matches? p EQUAL)
      (define equals (previous p))
      (define value (parse-assignment p))
@@ -105,6 +155,16 @@
      (assert expr variable?)
      (assign (variable-name expr) value)]
     [else expr]))
+
+(: parse-or (-> Parser Expr))
+(define (parse-or p)
+  (define token-matches (list OR))
+  (left-assosiative-binary p parse-and token-matches))
+
+(: parse-and (-> Parser Expr))
+(define (parse-and p)
+  (define token-matches (list AND))
+  (left-assosiative-binary p parse-equality token-matches))
 
 (: parse-equality (-> Parser Expr))
 (define (parse-equality p)
@@ -152,9 +212,9 @@
      (define expr (parse-expression p)) ; parse the following expression
      (consume! p RIGHT_PAREN "Expect ')' after expression")
      (grouping expr)]
-    [else 
-      (raise-parse-error (peek p) "Expect expression")
-      (expr)]))
+    [else
+     (raise-parse-error (peek p) "Expect expression")
+     (expr)]))
 
 ; (left-assosiative-binary parser (parser -> token) (listof Token-type)) -> token
 ; First parse the left side, which can be any expression of higher precedence.
@@ -174,18 +234,18 @@
 (: matches? (-> Parser Symbol * (Option Token)))
 (define (matches? p . types)
   (for/or ([type types])
-    (if (same-type? p type)
+    (if (check? p type)
         (advance! p)
         #f)))
 
 (: consume! (-> Parser Symbol String Token))
 (define (consume! p type message)
-  (unless (same-type? p type)
+  (unless (check? p type)
     (raise-parse-error (peek p) message))
   (advance! p))
 
-(: same-type? (-> Parser Symbol Boolean))
-(define (same-type? p type)
+(: check? (-> Parser Symbol Boolean))
+(define (check? p type)
   (and (not (at-end? p))
        (equal? (token-type (peek p)) type)))
 
@@ -203,7 +263,7 @@
   (vector-ref (parser-tokens p) (parser-current p)))
 
 (: previous (-> Parser Token))
-(define (previous p) 
+(define (previous p)
   (vector-ref (parser-tokens p) (sub1 (parser-current p))))
 
 ; (synchronize parser) -> void

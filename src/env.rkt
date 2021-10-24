@@ -10,8 +10,8 @@
   #:transparent)
 (define-type Env env)
 
-(: make-environment (->* () (Env) Env))
-(define (make-environment [enclosure #f])
+(: make-env (->* () (Env) Env))
+(define (make-env [enclosure #f])
   (env (make-hash) enclosure))
 
 (: env-define (-> Env String Any Void))
@@ -44,4 +44,4 @@
     [(env-enclosing e) (env-member (env-enclosing e) name)]
     [else 
       (raise-undefined-variable-error name (token-lexeme name))
-      (values null (make-environment))]))
+      (values null (make-env))]))
