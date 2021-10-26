@@ -13,8 +13,11 @@
 (struct expression-stmt stmt ([expr : Expr]) #:transparent)
 (define-type ExpressionStmt expression-stmt)
 
-(struct var-stmt stmt ([name : Token] [initializer : (Option Expr)]) #:transparent)
-(define-type VarStmt var-stmt)
+(struct var-decl stmt ([name : Token] [initializer : (Option Expr)]) #:transparent)
+(define-type VarDecl var-decl)
+
+(struct fun-decl stmt ([name : Token] [params : (Vectorof Token)] [body : BlockStmt]) #:transparent)
+(define-type FunDecl fun-decl)
 
 (struct block-stmt stmt ([statements : (Listof Stmt)]) #:transparent)
 (define-type BlockStmt block-stmt)

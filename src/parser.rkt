@@ -41,8 +41,31 @@
   (define (handle-parse-error e) (synchronize p) (stmt))
   (with-handlers ([exn:parse-error? handle-parse-error])
     (cond
+      [(matches? p FUN) (parse-fun-declaration p "function")]
       [(matches? p VAR) (parse-var-declaration p)]
       [else (parse-statement p)])))
+
+(: parse-fun-declaration (-> Parser String Stmt))
+(define (parse-fun-declaration p kind)
+  (define name (consume! p IDENTIFIER (format "Expect ~a name.")))
+  (consume! p LEFT_PAREN (format "Expect '(' after ~a name."))
+  (define params (parse-parameters p))
+  (consume! p RIGHT_PAREN "Expect ')' after parameters.")
+  (consume! p LEFT_BRACE (format "Expect '{' before ~a body."))
+  (define body (parse-block-statement p))
+  (fun-decl name params body))
+
+(: parse-parameters (-> Parser (Vectorof Token)))
+(define (parse-parameters p)
+  (let loop ([params : (Listof Token) null] [num : Natural 0])
+    (cond
+      [(check? p RIGHT_PAREN) ((inst list->vector Token) params)]
+      [(matches? p COMMA) (loop params num)]
+      [else
+       (when (>= num 255)
+         (make-parse-error (peek p) "Can't have more than 255 parameters."))
+       (define next-id (consume! p IDENTIFIER "Expect parameter name."))
+       (loop (cons next-id params) (add1 num))])))
 
 (: parse-var-declaration (-> Parser Stmt))
 (define (parse-var-declaration p)
@@ -52,7 +75,7 @@
   (when (matches? p EQUAL)
     (set! initializer (parse-expression p)))
   (consume! p SEMICOLON "Expect ';' after variable declaration.")
-  (var-stmt name initializer))
+  (var-decl name initializer))
 
 (: parse-statement (-> Parser Stmt))
 (define (parse-statement p)
@@ -193,7 +216,49 @@
      (define operator (previous p))
      (define right (parse-unary p))
      (unary operator right)]
-    [else (parse-primary p)]))
+    [else (parse-call p)]))
+
+(: parse-call (-> Parser Expr))
+(define (parse-call p)
+  (define expr (parse-primary p))
+  (let loop ([expr expr])
+    (cond
+      [(matches? p LEFT_PAREN)
+       (loop (finish-call p expr))]
+      [else expr])))
+
+(: finish-call (-> Parser Expr Expr))
+(define (finish-call p callee)
+  (define args : (Listof Expr) null)
+  (define argc : Natural 0)
+  (define (add-arg! args)
+    (set! args (cons (parse-expression p) args))
+    (set! argc (add1 argc)))
+  (unless (check? p RIGHT_PAREN)
+    (add-arg! args)
+    (when (>= argc 255)
+      (make-parse-error (peek p) "Can't have more than 255 arguments"))
+    (while (matches? p COMMA)
+           (add-arg! args)))
+  (define paren (consume! p RIGHT_PAREN "Expect ')' after arguments."))
+  (call callee paren (reverse args)))
+#|
+(: finish-call2 (-> Parser Expr Expr))
+(define (finish-call2 p callee)
+  (define total-args : (Listof Expr)
+    (let loop ([args : (Listof Expr) null] [argc : Natural 0])
+      (cond
+        [(check? p RIGHT_PAREN) args]
+        [else
+         (define next-arg (parse-expression p))
+         (cond
+           [(matches? p COMMA)
+            (when (>= argc 254)
+              (make-parse-error (peek p) "Can't have more than 255 arguments"))
+            (loop (cons next-arg args) (add1 argc))]
+           [else args])])))
+  (define paren (consume! p RIGHT_PAREN "Expect ')' after arguments."))
+  (call callee paren (reverse total-args))) |#
 
 (: parse-primary (-> Parser Expr))
 (define (parse-primary p)

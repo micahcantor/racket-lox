@@ -12,12 +12,15 @@
 
 (provide interpret! make-interpreter)
 
-(struct interpreter ([env : Env]) #:mutable)
+(struct interpreter ([env : Env] [globals : Env])
+  #:mutable)
 (define-type Interpreter interpreter)
 
 (: make-interpreter (->* () (Env) Interpreter))
 (define (make-interpreter [env (make-env)])
-  (interpreter env))
+  (define globals (make-env))
+  (env-define globals "clock" (make-clock))
+  (interpreter env globals))
 
 (: interpret! (-> Interpreter (Listof Stmt) Void))
 (define (interpret! i statements)
@@ -36,7 +39,7 @@
     [(block-stmt? stmt) (exec-block-stmt i stmt)]
     [(if-stmt? stmt) (exec-if-stmt i stmt)]
     [(while-stmt? stmt) (exec-while-stmt i stmt)]
-    [(var-stmt? stmt) (exec-var-stmt i stmt)]))
+    [(var-decl? stmt) (exec-var-decl i stmt)]))
 
 (: exec-expression-stmt (-> Interpreter ExpressionStmt Void))
 (define (exec-expression-stmt i stmt)
@@ -71,9 +74,9 @@
   (while (truthy? (evaluate i condition))
          (execute i body)))
 
-(: exec-var-stmt (-> Interpreter VarStmt Void))
-(define (exec-var-stmt i stmt)
-  (match-define (var-stmt name initializer) stmt)
+(: exec-var-decl (-> Interpreter VarDecl Void))
+(define (exec-var-decl i stmt)
+  (match-define (var-decl name initializer) stmt)
   (define value (if initializer (evaluate i initializer) null))
   (env-define (interpreter-env i) (token-lexeme name) value))
 
@@ -87,6 +90,7 @@
     [(assign? expr) (eval-assign i expr)]
     [(grouping? expr) (eval-grouping i expr)]
     [(unary? expr) (eval-unary i expr)]
+    [(call? expr) (eval-call i expr)]
     [(binary? expr) (eval-binary i expr)]))
 
 (: eval-literal (-> Interpreter LiteralExpr Any))
@@ -117,6 +121,22 @@
      (check-number-operand operator right)
      (- right)]
     [(quote BANG) (not (truthy? right))]))
+
+(: eval-call (-> Interpreter CallExpr Any))
+(define (eval-call i expr)
+  (define callee (evaluate i (call-callee expr)))
+  (unless (callable? callee)
+    (raise-runtime-error (call-paren expr) "Can only call functions and classes."))
+  (assert callee callable?)
+  (match-define (callable call arity) callee)
+  (define arguments : (Vectorof Any)
+    (for/vector ([arg (call-args expr)])
+      (evaluate i arg)))
+  (define argc (vector-length arguments))
+  (unless (= argc arity)
+    (raise-runtime-error (call-paren expr)
+                         (format "Expected ~a arguments but got ~a." arity argc)))
+  (call callee i arguments))
 
 (: eval-binary (-> Interpreter BinaryExpr Any))
 (define (eval-binary i expr)
@@ -161,7 +181,34 @@
        [else
         (raise-runtime-error operator "Operands must be two numbers or two strings.")])]))
 
+#| Callable |#
+
+(struct callable ([call : (-> Callable Interpreter (Vectorof Any) Any)] [arity : Natural]))
+(define-type Callable callable)
+
+(struct function callable ([declaration : FunDecl]))
+(define-type Function function)
+
+(: call-function (-> Callable Interpreter (Vectorof Any) Null))
+(define (call-function func i args)
+  (assert func function?)
+  (define declaration (function-declaration func))
+  (define env (make-env (interpreter-globals i)))
+  (define params (fun-decl-params declaration))
+  (for ([param params] [arg args])
+    (env-define env (token-lexeme param) arg))
+  (exec-block-stmt i (fun-decl-body declaration))
+  null)
+
+(: make-function (-> FunDecl Function))
+(define (make-function decl)
+  (function call-function (vector-length (fun-decl-params decl)) decl))
+
 #| Helpers |#
+
+(: make-clock (-> Callable))
+(define (make-clock)
+  (callable (λ (i args callee) (current-seconds)) 0))
 
 ; lox evaluates false and null literals to false
 (: truthy? (-> Any Boolean))

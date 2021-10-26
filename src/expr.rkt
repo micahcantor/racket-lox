@@ -13,6 +13,9 @@
 (struct binary expr ([left : Expr] [operator : Token] [right : Expr]) #:transparent)
 (define-type BinaryExpr binary)
 
+(struct call expr ([callee : Expr] [paren : Token] [args : (Listof Expr)]))
+(define-type CallExpr call)
+
 (struct grouping expr ([expression : Expr]) #:transparent)
 (define-type GroupingExpr grouping)
 
