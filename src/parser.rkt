@@ -47,11 +47,11 @@
 
 (: parse-fun-declaration (-> Parser String Stmt))
 (define (parse-fun-declaration p kind)
-  (define name (consume! p IDENTIFIER (format "Expect ~a name.")))
-  (consume! p LEFT_PAREN (format "Expect '(' after ~a name."))
+  (define name (consume! p IDENTIFIER (format "Expect ~a name." kind)))
+  (consume! p LEFT_PAREN (format "Expect '(' after ~a name." kind))
   (define params (parse-parameters p))
   (consume! p RIGHT_PAREN "Expect ')' after parameters.")
-  (consume! p LEFT_BRACE (format "Expect '{' before ~a body."))
+  (consume! p LEFT_BRACE (format "Expect '{' before ~a body." kind))
   (define body (parse-block-statement p))
   (fun-decl name params body))
 
@@ -59,7 +59,7 @@
 (define (parse-parameters p)
   (let loop ([params : (Listof Token) null] [num : Natural 0])
     (cond
-      [(check? p RIGHT_PAREN) ((inst list->vector Token) params)]
+      [(check? p RIGHT_PAREN) ((inst list->vector Token) (reverse params))]
       [(matches? p COMMA) (loop params num)]
       [else
        (when (>= num 255)
@@ -231,15 +231,15 @@
 (define (finish-call p callee)
   (define args : (Listof Expr) null)
   (define argc : Natural 0)
-  (define (add-arg! args)
+  (define (add-arg!)
     (set! args (cons (parse-expression p) args))
     (set! argc (add1 argc)))
   (unless (check? p RIGHT_PAREN)
-    (add-arg! args)
+    (add-arg!)
     (when (>= argc 255)
       (make-parse-error (peek p) "Can't have more than 255 arguments"))
     (while (matches? p COMMA)
-           (add-arg! args)))
+           (add-arg!)))
   (define paren (consume! p RIGHT_PAREN "Expect ')' after arguments."))
   (call callee paren (reverse args)))
 #|

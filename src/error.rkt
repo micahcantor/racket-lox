@@ -28,7 +28,7 @@
 
 (: make-parse-error (-> Token String exn:parse-error))
 (define (make-parse-error token message)
-  (lox-error token message) ; print error message and set had-error 
+  (lox-error token message) ; print error message and set had-error
   (exn:parse-error (lox-error-message (token-line token) message)
                    (current-continuation-marks)))
 
@@ -38,7 +38,7 @@
 
 #| Runtime errors |#
 
-(struct exn:runtime-error exn:fail ([token : Token]))
+(struct exn:runtime-error exn:fail ([token : Token]) #:transparent)
 (define-type RuntimeError exn:runtime-error)
 
 (: make-runtime-error (-> Token String exn:runtime-error))
@@ -51,15 +51,18 @@
 
 (: runtime-error (-> exn:runtime-error Void))
 (define (runtime-error e)
-  (displayln 
-   (format "~a\n[line ~a]" 
-           (exn-message e) 
-           (exn:runtime-error-token e)))
+  (displayln (runtime-error-message e))
   (set-had-runtime-error! #t))
+
+(: runtime-error-message (-> RuntimeError String))
+(define (runtime-error-message e)
+  (format "~a\n[line ~a]"
+          (exn-message e)
+          (token-line (exn:runtime-error-token e))))
 
 (: raise-undefined-variable-error (-> Token String exn:runtime-error))
 (define (raise-undefined-variable-error name lexeme)
-  (raise-runtime-error 
+  (raise-runtime-error
    name (format "Undefined variable '~a'." lexeme)))
 
 #| Lox errors |#

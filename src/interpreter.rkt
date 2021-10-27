@@ -24,7 +24,8 @@
 
 (: interpret! (-> Interpreter (Listof Stmt) Void))
 (define (interpret! i statements)
-  (define (handle-runtime-error e) (void))
+  (: handle-runtime-error (-> RuntimeError Void))
+  (define (handle-runtime-error e) (displayln (runtime-error-message e)))
   (with-handlers ([exn:runtime-error? handle-runtime-error])
     (for ([statement statements])
       (execute i statement))))
@@ -39,6 +40,7 @@
     [(block-stmt? stmt) (exec-block-stmt i stmt)]
     [(if-stmt? stmt) (exec-if-stmt i stmt)]
     [(while-stmt? stmt) (exec-while-stmt i stmt)]
+    [(fun-decl? stmt) (exec-fun-decl i stmt)]
     [(var-decl? stmt) (exec-var-decl i stmt)]))
 
 (: exec-expression-stmt (-> Interpreter ExpressionStmt Void))
@@ -51,12 +53,11 @@
   (define value (evaluate i (print-stmt-value stmt)))
   (displayln (value->string value)))
 
-(: exec-block-stmt (-> Interpreter BlockStmt Void))
-(define (exec-block-stmt i stmt)
+(: exec-block-stmt (->* (Interpreter BlockStmt) (Env) Void))
+(define (exec-block-stmt i stmt [env (make-env (interpreter-env i))])
   (define statements (block-stmt-statements stmt))
-  (define block-env (make-env (interpreter-env i)))
   (define previous (interpreter-env i))
-  (set-interpreter-env! i block-env)
+  (set-interpreter-env! i env)
   (for ([statement statements])
     (execute i statement))
   (set-interpreter-env! i previous))
@@ -73,6 +74,12 @@
   (match-define (while-stmt condition body) stmt)
   (while (truthy? (evaluate i condition))
          (execute i body)))
+
+(: exec-fun-decl (-> Interpreter FunDecl Void))
+(define (exec-fun-decl i stmt)
+  (define fun (function stmt))
+  (define fun-name (token-lexeme (fun-decl-name stmt)))
+  (env-define (interpreter-env i) fun-name fun))
 
 (: exec-var-decl (-> Interpreter VarDecl Void))
 (define (exec-var-decl i stmt)
@@ -124,19 +131,18 @@
 
 (: eval-call (-> Interpreter CallExpr Any))
 (define (eval-call i expr)
-  (define callee (evaluate i (call-callee expr)))
-  (unless (callable? callee)
-    (raise-runtime-error (call-paren expr) "Can only call functions and classes."))
-  (assert callee callable?)
-  (match-define (callable call arity) callee)
+  (match-define (call callee-expr call-site args) expr)
+  (define callee (evaluate i callee-expr))
+  (check-callable callee call-site)
+  (define arity (callable-arity callee))
   (define arguments : (Vectorof Any)
-    (for/vector ([arg (call-args expr)])
+    (for/vector ([arg args])
       (evaluate i arg)))
   (define argc (vector-length arguments))
   (unless (= argc arity)
-    (raise-runtime-error (call-paren expr)
-                         (format "Expected ~a arguments but got ~a." arity argc)))
-  (call callee i arguments))
+    (raise-runtime-error 
+      call-site (format "Expected ~a arguments but got ~a." arity argc)))
+  (callable-call callee i arguments))
 
 (: eval-binary (-> Interpreter BinaryExpr Any))
 (define (eval-binary i expr)
@@ -183,32 +189,59 @@
 
 #| Callable |#
 
-(struct callable ([call : (-> Callable Interpreter (Vectorof Any) Any)] [arity : Natural]))
-(define-type Callable callable)
+(define-type Callable (U Function NativeFunction))
 
-(struct function callable ([declaration : FunDecl]))
+(: callable? (Any -> Boolean : Callable))
+(define-predicate callable? Callable)
+
+(define-syntax-rule (check-callable callee call-site)
+  (begin
+    (unless (callable? callee)
+      (raise-runtime-error call-site "Can only call functions and classes."))
+    (assert callee callable?)))
+
+(: callable-call (-> Callable Interpreter (Vectorof Any) Any))
+(define (callable-call callee i args)
+  (match callee
+    [(function _) (call-function callee i args)]
+    [(native-function call-func _) (call-func callee i args)]))
+
+(: callable-arity (-> Callable Natural))
+(define (callable-arity callee)
+  (match callee
+    [(function (fun-decl _ params _)) (vector-length params)]
+    [(native-function _ arity) arity]))
+
+(: callable->string (-> Callable String))
+(define (callable->string callee)
+  (match callee
+    [(function (fun-decl name _ _)) (format "< ~a >" (token-lexeme name))]
+    [(native-function _ _) "<native fn>"]))
+
+(struct function ([declaration : FunDecl]))
 (define-type Function function)
 
-(: call-function (-> Callable Interpreter (Vectorof Any) Null))
+(: call-function (-> Function Interpreter (Vectorof Any) Null))
 (define (call-function func i args)
-  (assert func function?)
   (define declaration (function-declaration func))
   (define env (make-env (interpreter-globals i)))
   (define params (fun-decl-params declaration))
   (for ([param params] [arg args])
     (env-define env (token-lexeme param) arg))
-  (exec-block-stmt i (fun-decl-body declaration))
+  (exec-block-stmt i (fun-decl-body declaration) env)
   null)
 
 (: make-function (-> FunDecl Function))
-(define (make-function decl)
-  (function call-function (vector-length (fun-decl-params decl)) decl))
+(define make-function function)
+
+(struct native-function ([call : (-> NativeFunction Interpreter (Vectorof Any) Any)] [arity : Natural]))
+(define-type NativeFunction native-function)
+
+(: make-clock (-> NativeFunction))
+(define (make-clock)
+  (native-function (λ (callee i args) (current-seconds)) 0))
 
 #| Helpers |#
-
-(: make-clock (-> Callable))
-(define (make-clock)
-  (callable (λ (i args callee) (current-seconds)) 0))
 
 ; lox evaluates false and null literals to false
 (: truthy? (-> Any Boolean))
