@@ -30,3 +30,6 @@
 
 (struct while-stmt stmt ([condition : Expr] [body : Stmt]) #:transparent)
 (define-type WhileStmt while-stmt)
+
+(struct return-stmt stmt ([keyword : Token] [value : (Option Expr)]))
+(define-type ReturnStmt return-stmt)

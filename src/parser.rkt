@@ -85,6 +85,7 @@
     [(matches? p IF) (parse-if-statement p)]
     [(matches? p WHILE) (parse-while-statement p)]
     [(matches? p FOR) (parse-for-statement p)]
+    [(matches? p RETURN) (parse-return-statement p)]
     [else (parse-expression-statement p)]))
 
 (: parse-print-statement (-> Parser PrintStmt))
@@ -148,6 +149,15 @@
   (when initializer
     (set! body (block-stmt (list initializer body))))
   body)
+
+(: parse-return-statement (-> Parser ReturnStmt))
+(define (parse-return-statement p)
+  (define keyword (previous p))
+  (define value
+    (and (not (check? p SEMICOLON))
+         (parse-expression p)))
+  (consume! p SEMICOLON "Expect ';' after return value.")
+  (return-stmt keyword value))
 
 (: parse-expression-statement (-> Parser ExpressionStmt))
 (define (parse-expression-statement p)
@@ -242,23 +252,6 @@
            (add-arg!)))
   (define paren (consume! p RIGHT_PAREN "Expect ')' after arguments."))
   (call callee paren (reverse args)))
-#|
-(: finish-call2 (-> Parser Expr Expr))
-(define (finish-call2 p callee)
-  (define total-args : (Listof Expr)
-    (let loop ([args : (Listof Expr) null] [argc : Natural 0])
-      (cond
-        [(check? p RIGHT_PAREN) args]
-        [else
-         (define next-arg (parse-expression p))
-         (cond
-           [(matches? p COMMA)
-            (when (>= argc 254)
-              (make-parse-error (peek p) "Can't have more than 255 arguments"))
-            (loop (cons next-arg args) (add1 argc))]
-           [else args])])))
-  (define paren (consume! p RIGHT_PAREN "Expect ')' after arguments."))
-  (call callee paren (reverse total-args))) |#
 
 (: parse-primary (-> Parser Expr))
 (define (parse-primary p)

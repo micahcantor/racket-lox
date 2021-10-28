@@ -16,11 +16,12 @@
   #:mutable)
 (define-type Interpreter interpreter)
 
-(: make-interpreter (->* () (Env) Interpreter))
-(define (make-interpreter [env (make-env)])
+(: make-interpreter (-> Interpreter))
+(define (make-interpreter)
   (define globals (make-env))
+  (define environment globals)
   (env-define globals "clock" (make-clock))
-  (interpreter env globals))
+  (interpreter environment globals))
 
 (: interpret! (-> Interpreter (Listof Stmt) Void))
 (define (interpret! i statements)
@@ -40,6 +41,7 @@
     [(block-stmt? stmt) (exec-block-stmt i stmt)]
     [(if-stmt? stmt) (exec-if-stmt i stmt)]
     [(while-stmt? stmt) (exec-while-stmt i stmt)]
+    [(return-stmt? stmt) (exec-return-stmt i stmt)]
     [(fun-decl? stmt) (exec-fun-decl i stmt)]
     [(var-decl? stmt) (exec-var-decl i stmt)]))
 
@@ -58,8 +60,13 @@
   (define statements (block-stmt-statements stmt))
   (define previous (interpreter-env i))
   (set-interpreter-env! i env)
-  (for ([statement statements])
-    (execute i statement))
+  (: handle-return (-> Return Any))
+  (define (handle-return v)
+    (set-interpreter-env! i previous) 
+    (raise v))
+  (with-handlers ([return? handle-return])
+    (for ([statement statements])
+      (execute i statement)))
   (set-interpreter-env! i previous))
 
 (: exec-if-stmt (-> Interpreter IfStmt Void))
@@ -74,6 +81,15 @@
   (match-define (while-stmt condition body) stmt)
   (while (truthy? (evaluate i condition))
          (execute i body)))
+
+(: exec-return-stmt (-> Interpreter ReturnStmt Void))
+(define (exec-return-stmt i stmt)
+  (define value 
+    (if (return-stmt-value stmt)
+        (evaluate i (return-stmt-value stmt))
+        null))
+  (raise (make-return value))
+  (void))
 
 (: exec-fun-decl (-> Interpreter FunDecl Void))
 (define (exec-fun-decl i stmt)
@@ -221,15 +237,23 @@
 (struct function ([declaration : FunDecl]))
 (define-type Function function)
 
-(: call-function (-> Function Interpreter (Vectorof Any) Null))
+(struct return exn ([value : Any]))
+(define-type Return return)
+
+(: make-return (-> Any Return))
+(define (make-return v)
+  (return "" (current-continuation-marks) v))
+
+(: call-function (-> Function Interpreter (Vectorof Any) Any))
 (define (call-function func i args)
   (define declaration (function-declaration func))
   (define env (make-env (interpreter-globals i)))
   (define params (fun-decl-params declaration))
   (for ([param params] [arg args])
     (env-define env (token-lexeme param) arg))
-  (exec-block-stmt i (fun-decl-body declaration) env)
-  null)
+  (with-handlers ([return? return-value])
+    (exec-block-stmt i (fun-decl-body declaration) env)
+    null))
 
 (: make-function (-> FunDecl Function))
 (define make-function function)
