@@ -47,18 +47,14 @@
 
 (: raise-runtime-error (-> Token String exn:runtime-error))
 (define (raise-runtime-error token message)
+  (set-had-runtime-error! #t)
   (raise (make-runtime-error token message)))
-
-(: runtime-error (-> exn:runtime-error Void))
-(define (runtime-error e)
-  (displayln (runtime-error-message e))
-  (set-had-runtime-error! #t))
 
 (: runtime-error-message (-> RuntimeError String))
 (define (runtime-error-message e)
-  (format "~a\n[line ~a]"
-          (exn-message e)
-          (token-line (exn:runtime-error-token e))))
+  (format "[line ~a] ~a"
+          (token-line (exn:runtime-error-token e))
+          (exn-message e)))
 
 (: raise-undefined-variable-error (-> Token String exn:runtime-error))
 (define (raise-undefined-variable-error name lexeme)

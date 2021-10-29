@@ -12,8 +12,7 @@
 
 (provide interpret! make-interpreter)
 
-(struct interpreter ([env : Env] [globals : Env])
-  #:mutable)
+(struct interpreter ([env : Env] [globals : Env]) #:mutable)
 (define-type Interpreter interpreter)
 
 (: make-interpreter (-> Interpreter))
@@ -59,11 +58,11 @@
 (define (exec-block-stmt i stmt [env (make-env (interpreter-env i))])
   (define statements (block-stmt-statements stmt))
   (define previous (interpreter-env i))
-  (set-interpreter-env! i env)
   (: handle-return (-> Return Any))
   (define (handle-return v)
-    (set-interpreter-env! i previous) 
+    (set-interpreter-env! i previous)
     (raise v))
+  (set-interpreter-env! i env)
   (with-handlers ([return? handle-return])
     (for ([statement statements])
       (execute i statement)))
@@ -73,8 +72,10 @@
 (define (exec-if-stmt i stmt)
   (match-define (if-stmt condition consequent alternate) stmt)
   (cond
-    [(truthy? (evaluate i condition)) (execute i consequent)]
-    [alternate (execute i alternate)]))
+    [(truthy? (evaluate i condition))
+     (execute i consequent)]
+    [alternate
+     (execute i alternate)]))
 
 (: exec-while-stmt (-> Interpreter WhileStmt Void))
 (define (exec-while-stmt i stmt)
@@ -84,7 +85,7 @@
 
 (: exec-return-stmt (-> Interpreter ReturnStmt Void))
 (define (exec-return-stmt i stmt)
-  (define value 
+  (define value
     (if (return-stmt-value stmt)
         (evaluate i (return-stmt-value stmt))
         null))
@@ -93,9 +94,10 @@
 
 (: exec-fun-decl (-> Interpreter FunDecl Void))
 (define (exec-fun-decl i stmt)
-  (define fun (function stmt))
+  (define env (interpreter-env i))
+  (define fun (function stmt env))
   (define fun-name (token-lexeme (fun-decl-name stmt)))
-  (env-define (interpreter-env i) fun-name fun))
+  (env-define env fun-name fun))
 
 (: exec-var-decl (-> Interpreter VarDecl Void))
 (define (exec-var-decl i stmt)
@@ -156,8 +158,8 @@
       (evaluate i arg)))
   (define argc (vector-length arguments))
   (unless (= argc arity)
-    (raise-runtime-error 
-      call-site (format "Expected ~a arguments but got ~a." arity argc)))
+    (raise-runtime-error
+     call-site (format "Expected ~a arguments but got ~a." arity argc)))
   (callable-call callee i arguments))
 
 (: eval-binary (-> Interpreter BinaryExpr Any))
@@ -172,7 +174,8 @@
      (if (truthy? left) right left)]
     [(quote BANG_EQUAL)
      (not (lox-equal? left right))]
-    [(quote EQUAL_EQUAL) (lox-equal? left right)]
+    [(quote EQUAL_EQUAL) 
+      (lox-equal? left right)]
     [(quote GREATER)
      (check-number-operands operator left right)
      (> left right)]
@@ -219,22 +222,22 @@
 (: callable-call (-> Callable Interpreter (Vectorof Any) Any))
 (define (callable-call callee i args)
   (match callee
-    [(function _) (call-function callee i args)]
+    [(function _ _) (call-function callee i args)]
     [(native-function call-func _) (call-func callee i args)]))
 
 (: callable-arity (-> Callable Natural))
 (define (callable-arity callee)
   (match callee
-    [(function (fun-decl _ params _)) (vector-length params)]
+    [(function (fun-decl _ params _) _) (vector-length params)]
     [(native-function _ arity) arity]))
 
 (: callable->string (-> Callable String))
 (define (callable->string callee)
   (match callee
-    [(function (fun-decl name _ _)) (format "< ~a >" (token-lexeme name))]
+    [(function (fun-decl name _ _) _) (format "< ~a >" (token-lexeme name))]
     [(native-function _ _) "<native fn>"]))
 
-(struct function ([declaration : FunDecl]))
+(struct function ([declaration : FunDecl] [closure : Env]))
 (define-type Function function)
 
 (struct return exn ([value : Any]))
@@ -247,16 +250,13 @@
 (: call-function (-> Function Interpreter (Vectorof Any) Any))
 (define (call-function func i args)
   (define declaration (function-declaration func))
-  (define env (make-env (interpreter-globals i)))
+  (define env (make-env (function-closure func)))
   (define params (fun-decl-params declaration))
   (for ([param params] [arg args])
     (env-define env (token-lexeme param) arg))
   (with-handlers ([return? return-value])
     (exec-block-stmt i (fun-decl-body declaration) env)
     null))
-
-(: make-function (-> FunDecl Function))
-(define make-function function)
 
 (struct native-function ([call : (-> NativeFunction Interpreter (Vectorof Any) Any)] [arity : Natural]))
 (define-type NativeFunction native-function)
