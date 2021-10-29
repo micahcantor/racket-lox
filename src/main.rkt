@@ -5,6 +5,7 @@
 (require "parser.rkt")
 (require "scanner.rkt")
 (require "interpreter.rkt")
+(require "resolver.rkt")
 (require "error.rkt")
 (require "stmt.rkt")
 (require "pretty-print.rkt")
@@ -40,8 +41,11 @@
   (define tokens (scan-tokens! scanner))
   (define parser (make-parser tokens))
   (define statements (parse! parser))
-  (define interpreter (make-interpreter))
   (unless had-error
-    (interpret! interpreter statements)))
+    (define interpreter (make-interpreter))
+    (define resolver (make-resolver interpreter))
+    (resolve-all! resolver statements)
+    (unless had-error 
+      (interpret! interpreter statements))))
 
 (main)

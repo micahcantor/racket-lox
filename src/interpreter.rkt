@@ -10,17 +10,20 @@
 (require "env.rkt")
 (require "utils/while.rkt")
 
-(provide interpret! make-interpreter)
+(provide interpret! make-interpreter interpreter-resolve! Interpreter)
 
-(struct interpreter ([env : Env] [globals : Env]) #:mutable)
+(struct interpreter ([env : Env]
+                     [globals : Env] 
+                     [locals : (HashTable Expr Integer)]) #:mutable)
 (define-type Interpreter interpreter)
 
 (: make-interpreter (-> Interpreter))
 (define (make-interpreter)
   (define globals (make-env))
   (define environment globals)
+  (define locals : (HashTable Expr Integer) (make-hash))
   (env-define globals "clock" (make-clock))
-  (interpreter environment globals))
+  (interpreter environment globals locals))
 
 (: interpret! (-> Interpreter (Listof Stmt) Void))
 (define (interpret! i statements)
@@ -29,6 +32,12 @@
   (with-handlers ([exn:runtime-error? handle-runtime-error])
     (for ([statement statements])
       (execute i statement))))
+
+#| Resolving |#
+
+(: interpreter-resolve! (-> Interpreter Expr Integer Void))
+(define (interpreter-resolve! i expr depth)
+  (hash-set! (interpreter-locals i) expr depth))
 
 #| Statements |#
 
@@ -126,11 +135,23 @@
 (define (eval-variable-expression i expr)
   (env-get (interpreter-env i) (variable-name expr)))
 
+(: lookup-variable (-> Interpreter Token Expr Any))
+(define (lookup-variable i name expr)
+  (match-define (interpreter env globals locals) i)
+  (define distance (hash-ref locals expr #f))
+  (if distance
+      (env-get-at env distance (token-lexeme name))
+      (env-get globals name)))
+
 (: eval-assign (-> Interpreter AssignExpr Any))
 (define (eval-assign i expr)
+  (match-define (interpreter env globals locals) i)
   (match-define (assign name val) expr)
   (define value (evaluate i val))
-  (env-assign (interpreter-env i) name value)
+  (define distance (hash-ref locals expr #f))
+  (if distance
+      (env-assign-at env distance name value)
+      (env-assign globals name value))
   value) ; return the assigned value
 
 (: eval-grouping (-> Interpreter GroupingExpr Any))
@@ -174,8 +195,8 @@
      (if (truthy? left) right left)]
     [(quote BANG_EQUAL)
      (not (lox-equal? left right))]
-    [(quote EQUAL_EQUAL) 
-      (lox-equal? left right)]
+    [(quote EQUAL_EQUAL)
+     (lox-equal? left right)]
     [(quote GREATER)
      (check-number-operands operator left right)
      (> left right)]
@@ -253,7 +274,7 @@
   (define env (make-env (function-closure func)))
   (define params (fun-decl-params declaration))
   (for ([param params] [arg args])
-    (env-define env (token-lexeme param) arg))
+    (env-define env (token-lexeme param) arg))interpreter-resolve!
   (with-handlers ([return? return-value])
     (exec-block-stmt i (fun-decl-body declaration) env)
     null))
