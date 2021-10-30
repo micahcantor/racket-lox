@@ -74,14 +74,16 @@
   (define scopes (resolver-scopes r))
   (define name (variable-name expr))
   (when (and (not (stack-empty? scopes))
+             (hash-has-key? (stack-top scopes) (token-lexeme name))
              (not (hash-ref (stack-top scopes) (token-lexeme name))))
     (lox-error name "Can't read local variable in its own initializer."))
   (resolve-local! r expr name))
 
 (: resolve-assign-expr! (-> Resolver AssignExpr Void))
 (define (resolve-assign-expr! r expr)
-  (resolve! r expr)
-  (resolve-local! r expr (assign-name expr)))
+  (match-define (assign name value) expr)
+  (resolve! r value)
+  (resolve-local! r expr name))
 
 (: resolve-expr-stmt! (-> Resolver ExpressionStmt Void))
 (define (resolve-expr-stmt! r stmt)
@@ -152,7 +154,7 @@
     (define scope (stack-top scopes))
     (if (hash-has-key? scope (token-lexeme name))
         (lox-error name "Already a variable with this name in this scope.")
-        (hash-set! (stack-top scopes) (token-lexeme name) #f))))
+        (hash-set! scope (token-lexeme name) #f))))
 
 (: define! (-> Resolver Token Void))
 (define (define! r name)
@@ -163,11 +165,11 @@
 (: resolve-local! (-> Resolver Expr Token Void))
 (define (resolve-local! r expr name)
   (define interpreter (resolver-interpreter r))
-  (define scopes (resolver-scopes r))
-  (for/or ([scope (stack-data scopes)]
+  (match-define (stack data size) (resolver-scopes r))
+  (for/or ([scope (reverse data)]
            [i (in-naturals)]
            #:when (hash-has-key? scope (token-lexeme name)))
-    (interpreter-resolve! interpreter expr i))
+    (interpreter-resolve! interpreter expr (- size i 2)))
   (void))
 
 (: resolve-function! (-> Resolver FunDecl FunctionType Void))

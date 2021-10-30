@@ -13,11 +13,10 @@
 (define (parse! p)
   (define (handle-parse-error e) null)
   (with-handlers ([exn:parse-error? handle-parse-error])
-    (: statements (Listof Stmt))
-    (define statements null)
-    (while (not (at-end? p))
-           (set! statements (cons (parse-declaration p) statements)))
-    (reverse statements)))
+    (let loop ([statements : (Listof Stmt) null])
+      (if (at-end? p)
+          (reverse statements)
+          (loop (cons (parse-declaration p) statements))))))
 
 (struct parser ([tokens : (Vectorof Token)]
                 [current : Integer])

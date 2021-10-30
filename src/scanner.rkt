@@ -64,7 +64,7 @@
     [#\< (add-token! s (if (matches? s #\=) LESS_EQUAL LESS))]
     [#\> (add-token! s (if (matches? s #\=) GREATER_EQUAL GREATER))]
     [#\/ (if (matches? s #\/)
-             (while (and (not (next-is? s #\n)) (not (at-end? s)))
+             (while (and (not (next-is? s #\newline)) (not (at-end? s)))
                     (advance! s)) ; ignore comments to the end of a line
              (add-token! s  SLASH))]
     [#\newline (scanner-next-line! s)] ; increment line number

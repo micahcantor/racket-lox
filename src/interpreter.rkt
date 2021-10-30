@@ -133,7 +133,7 @@
 
 (: eval-variable-expression (-> Interpreter VariableExpr Any))
 (define (eval-variable-expression i expr)
-  (env-get (interpreter-env i) (variable-name expr)))
+  (lookup-variable i (variable-name expr) expr))
 
 (: lookup-variable (-> Interpreter Token Expr Any))
 (define (lookup-variable i name expr)
