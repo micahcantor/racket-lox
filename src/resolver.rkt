@@ -18,7 +18,8 @@
 
 (struct NONE ())
 (struct FUNCTION ())
-(define-type FunctionType (U NONE FUNCTION))
+(struct METHOD ())
+(define-type FunctionType (U NONE FUNCTION METHOD))
 
 (: make-resolver (-> Interpreter Resolver))
 (define (make-resolver i)
@@ -46,6 +47,9 @@
     [(binary? val) (resolve-binary-expr! r val)]
     [(unary? val) (resolve-unary-expr! r val)]
     [(call? val) (resolve-call-expr! r val)]
+    [(get? val) (resolve-get-expr! r val)]
+    [(set-expr? val) (resolve-set-expr! r val)]
+    [(this-expr? val) (resolve-this-expr! r val)]
     [(grouping? val) (resolve-grouping-expr! r val)]
     [(literal? val) (resolve-literal-expr!)]))
 
@@ -72,9 +76,16 @@
 
 (: resolve-class-decl! (-> Resolver ClassDecl Void))
 (define (resolve-class-decl! r stmt)
-  (define name (class-decl-name stmt))
+  (match-define (class-decl name methods) stmt)
   (declare! r name)
-  (define! r name))
+  (define! r name)
+  (begin-scope! r)
+  ; resolve "this" to a local variable within class body.
+  (hash-set (stack-top (resolver-scopes r)) "this" #t)
+  (for ([method methods])
+    (define declaration (METHOD))
+    (resolve-function! r method declaration))
+  (end-scope! r))
 
 (: resolve-var-expr! (-> Resolver VariableExpr Void))
 (define (resolve-var-expr! r expr)
@@ -133,8 +144,22 @@
   (for ([arg args])
     (resolve! r arg)))
 
+(: resolve-get-expr! (-> Resolver GetExpr Void))
+(define (resolve-get-expr! r expr)
+  (resolve! r (get-object expr)))
+
+(: resolve-set-expr! (-> Resolver SetExpr Void))
+(define (resolve-set-expr! r expr)
+  (resolve! r (set-expr-value expr))
+  (resolve! r (set-expr-object expr)))
+
+(: resolve-this-expr! (-> Resolver ThisExpr Void))
+(define (resolve-this-expr! r expr)
+  (resolve-local! r expr (this-expr-keyword expr)))
+
 (: resolve-grouping-expr! (-> Resolver GroupingExpr Void))
 (define (resolve-grouping-expr! r expr)
+  ; we don't resolve the caller because of dynamic dispatch.
   (resolve! r (grouping-expression expr)))
 
 (: resolve-unary-expr! (-> Resolver UnaryExpr Void))

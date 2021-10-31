@@ -108,9 +108,15 @@
 (: exec-class-decl (-> Interpreter ClassDecl Void))
 (define (exec-class-decl i stmt)
   (match-define (class-decl name methods) stmt)
-  (env-define (interpreter-env i) (token-lexeme name) null)
-  (define lox-class (make-class (token-lexeme name)))
-  (env-assign (interpreter-env i) name lox-class))
+  (define env (interpreter-env i))
+  (env-define env (token-lexeme name) null)
+  (define class-methods : (HashTable String Function) (make-hash))
+  (for ([method methods])
+    (define fun (function method env))
+    (define name (token-lexeme (fun-decl-name method)))
+    (hash-set! class-methods name fun))
+  (define lox-class (make-class (token-lexeme name) class-methods))
+  (env-assign env name lox-class))
 
 (: exec-fun-decl (-> Interpreter FunDecl Void))
 (define (exec-fun-decl i stmt)
@@ -136,6 +142,8 @@
     [(grouping? expr) (eval-grouping i expr)]
     [(unary? expr) (eval-unary i expr)]
     [(call? expr) (eval-call i expr)]
+    [(get? expr) (eval-get i expr)]
+    [(set-expr? expr) (eval-set-expr i expr)]
     [(binary? expr) (eval-binary i expr)]))
 
 (: eval-literal (-> Interpreter LiteralExpr Any))
@@ -194,6 +202,30 @@
      call-site (format "Expected ~a arguments but got ~a." arity argc)))
   (callable-call callee i arguments))
 
+(: eval-get (-> Interpreter GetExpr Any))
+(define (eval-get i expr)
+  (match-define (get obj name) expr)
+  (define object (evaluate i obj))
+  (if (instance? object)
+      (instance-get object name)
+      (raise-runtime-error name (format "Undefined property '~a'." (token-lexeme name)))))
+
+(: eval-set-expr (-> Interpreter SetExpr Any))
+(define (eval-set-expr i expr)
+  (match-define (set-expr expr-object expr-name expr-value) expr)
+  (define object (evaluate i expr-object))
+  (cond
+    [(instance? object)
+     (define value (evaluate i expr-value))
+     (instance-set! object expr-name value)
+     value]
+    [else
+     (raise-runtime-error expr-name "Only instance have fields.")]))
+
+(: eval-this-expr (-> Interpreter ThisExpr Any))
+(define (eval-this-expr i expr)
+  (lookup-variable i (this-expr-keyword expr) expr))
+
 (: eval-binary (-> Interpreter BinaryExpr Any))
 (define (eval-binary i expr)
   (match-define (binary l operator r) expr)
@@ -240,7 +272,7 @@
 
 #| Callable |#
 
-(define-type Callable (U Function NativeFunction))
+(define-type Callable (U Function NativeFunction Class))
 
 (: callable? (Any -> Boolean : Callable))
 (define-predicate callable? Callable)
@@ -256,21 +288,21 @@
   (match callee
     [(function _ _) (call-function callee i args)]
     [(native-function call-func _) (call-func callee i args)]
-    [(class _) (call-class callee i args)]))
+    [(class _ _) (call-class callee i args)]))
 
 (: callable-arity (-> Callable Natural))
 (define (callable-arity callee)
   (match callee
     [(function (fun-decl _ params _) _) (vector-length params)]
     [(native-function _ arity) arity]
-    [(class _) 0]))
+    [(class _ _) 0]))
 
 (: callable->string (-> Callable String))
 (define (callable->string callee)
   (match callee
     [(function (fun-decl name _ _) _) (format "< ~a >" (token-lexeme name))]
     [(native-function _ _) "<native fn>"]
-    [(class name) name]))
+    [(class name _) name]))
 
 (: call-function (-> Function Interpreter (Vectorof Any) Any))
 (define (call-function func i args)
@@ -330,4 +362,5 @@
          (substring text (- (string-length text) 2))
          text)]
     [(callable? v) (callable->string v)]
+    [(instance? v) (instance->string v)]
     [else (~a v)]))

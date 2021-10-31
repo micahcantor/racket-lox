@@ -1,5 +1,6 @@
 #lang typed/racket/base
 
+(require racket/match)
 (require racket/function)
 (require "utils/while.rkt")
 (require "token.rkt")
@@ -197,6 +198,10 @@
        (lox-error equals "Invalid assignment target."))
      (assert expr variable?)
      (assign (variable-name expr) value)]
+    [(get? expr)
+     (match-define (get object name) expr)
+     (define value (parse-assignment p))
+     (set-expr object name value)]
     [else expr]))
 
 (: parse-or (-> Parser Expr))
@@ -245,7 +250,10 @@
     (cond
       [(matches? p LEFT_PAREN)
        (loop (finish-call p expr))]
-      [else expr])))
+      [(matches? p DOT)
+       (define name (consume! p IDENTIFIER "Expect property name after '.'."))
+       (loop (get expr name))]
+      [else expr])))  
 
 (: finish-call (-> Parser Expr Expr))
 (define (finish-call p callee)
@@ -276,6 +284,8 @@
      (literal (token-literal (previous p)))]
     [(matches? p IDENTIFIER)
      (variable (previous p))]
+    [(matches? p THIS)
+     (this-expr (previous p))]
     [(matches? p LEFT_PAREN)
      (define expr (parse-expression p)) ; parse the following expression
      (consume! p RIGHT_PAREN "Expect ')' after expression")
