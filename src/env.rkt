@@ -33,7 +33,7 @@
 
 (: env-ancestor (-> Env Integer Env))
 (define (env-ancestor e dist)
-  (define env : Env e)
+  (define env e)
   (for ([i (in-range dist)])
     (set! env (assert (env-enclosing env))))
   env)

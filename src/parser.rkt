@@ -40,11 +40,22 @@
   (define (handle-parse-error e) (synchronize p) (stmt))
   (with-handlers ([exn:parse-error? handle-parse-error])
     (cond
+      [(matches? p CLASS) (parse-class-declaration p)]
       [(matches? p FUN) (parse-fun-declaration p "function")]
       [(matches? p VAR) (parse-var-declaration p)]
       [else (parse-statement p)])))
 
-(: parse-fun-declaration (-> Parser String Stmt))
+(: parse-class-declaration (-> Parser ClassDecl))
+(define (parse-class-declaration p)
+  (define name (consume! p IDENTIFIER "Expect class name."))
+  (consume! p LEFT_BRACE "Expect '{' before class body.")
+  (define methods : (Listof FunDecl) null)
+  (while (and (not (check? p RIGHT_BRACE)) (not (at-end? p)))
+    (set! methods (cons (parse-fun-declaration p "method") methods)))
+  (consume! p RIGHT_BRACE "Expect '}' after class body.")
+  (class-decl name (reverse methods)))
+
+(: parse-fun-declaration (-> Parser String FunDecl))
 (define (parse-fun-declaration p kind)
   (define name (consume! p IDENTIFIER (format "Expect ~a name." kind)))
   (consume! p LEFT_PAREN (format "Expect '(' after ~a name." kind))
@@ -66,7 +77,7 @@
        (define next-id (consume! p IDENTIFIER "Expect parameter name."))
        (loop (cons next-id params) (add1 num))])))
 
-(: parse-var-declaration (-> Parser Stmt))
+(: parse-var-declaration (-> Parser VarDecl))
 (define (parse-var-declaration p)
   (define name (consume! p IDENTIFIER "Expect variable name."))
   (: initializer (Option Expr))

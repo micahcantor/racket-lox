@@ -8,14 +8,17 @@
 (require "token.rkt")
 (require "error.rkt")
 (require "env.rkt")
+(require "class.rkt")
+(require "function.rkt")
+(require "instance.rkt")
 (require "utils/while.rkt")
 
 (provide interpret! make-interpreter interpreter-resolve! Interpreter)
 
+(define-type Interpreter interpreter)
 (struct interpreter ([env : Env]
                      [globals : Env] 
                      [locals : (HashTable Expr Integer)]) #:mutable)
-(define-type Interpreter interpreter)
 
 (: make-interpreter (-> Interpreter))
 (define (make-interpreter)
@@ -50,6 +53,7 @@
     [(if-stmt? stmt) (exec-if-stmt i stmt)]
     [(while-stmt? stmt) (exec-while-stmt i stmt)]
     [(return-stmt? stmt) (exec-return-stmt i stmt)]
+    [(class-decl? stmt) (exec-class-decl i stmt)]
     [(fun-decl? stmt) (exec-fun-decl i stmt)]
     [(var-decl? stmt) (exec-var-decl i stmt)]))
 
@@ -100,6 +104,13 @@
         null))
   (raise (make-return value))
   (void))
+
+(: exec-class-decl (-> Interpreter ClassDecl Void))
+(define (exec-class-decl i stmt)
+  (match-define (class-decl name methods) stmt)
+  (env-define (interpreter-env i) (token-lexeme name) null)
+  (define lox-class (make-class (token-lexeme name)))
+  (env-assign (interpreter-env i) name lox-class))
 
 (: exec-fun-decl (-> Interpreter FunDecl Void))
 (define (exec-fun-decl i stmt)
@@ -244,29 +255,22 @@
 (define (callable-call callee i args)
   (match callee
     [(function _ _) (call-function callee i args)]
-    [(native-function call-func _) (call-func callee i args)]))
+    [(native-function call-func _) (call-func callee i args)]
+    [(class _) (call-class callee i args)]))
 
 (: callable-arity (-> Callable Natural))
 (define (callable-arity callee)
   (match callee
     [(function (fun-decl _ params _) _) (vector-length params)]
-    [(native-function _ arity) arity]))
+    [(native-function _ arity) arity]
+    [(class _) 0]))
 
 (: callable->string (-> Callable String))
 (define (callable->string callee)
   (match callee
     [(function (fun-decl name _ _) _) (format "< ~a >" (token-lexeme name))]
-    [(native-function _ _) "<native fn>"]))
-
-(struct function ([declaration : FunDecl] [closure : Env]))
-(define-type Function function)
-
-(struct return exn ([value : Any]))
-(define-type Return return)
-
-(: make-return (-> Any Return))
-(define (make-return v)
-  (return "" (current-continuation-marks) v))
+    [(native-function _ _) "<native fn>"]
+    [(class name) name]))
 
 (: call-function (-> Function Interpreter (Vectorof Any) Any))
 (define (call-function func i args)
@@ -278,6 +282,10 @@
   (with-handlers ([return? return-value])
     (exec-block-stmt i (fun-decl-body declaration) env)
     null))
+
+(: call-class (-> Class Interpreter (Vectorof Any) Any))
+(define (call-class class i args)
+  (make-instance class))
 
 (struct native-function ([call : (-> NativeFunction Interpreter (Vectorof Any) Any)] [arity : Natural]))
 (define-type NativeFunction native-function)
@@ -321,4 +329,5 @@
      (if (string-suffix? text ".0")
          (substring text (- (string-length text) 2))
          text)]
+    [(callable? v) (callable->string v)]
     [else (~a v)]))

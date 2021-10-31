@@ -35,6 +35,7 @@
     [(block-stmt? val) (resolve-block-stmt! r val)]
     [(var-decl? val) (resolve-var-decl! r val)]
     [(fun-decl? val) (resolve-fun-decl! r val)]
+    [(class-decl? val) (resolve-class-decl! r val)]
     [(variable? val) (resolve-var-expr! r val)]
     [(assign? val) (resolve-assign-expr! r val)]
     [(expression-stmt? val) (resolve-expr-stmt! r val)]
@@ -68,6 +69,12 @@
   (declare! r name)
   (define! r name)
   (resolve-function! r stmt (FUNCTION)))
+
+(: resolve-class-decl! (-> Resolver ClassDecl Void))
+(define (resolve-class-decl! r stmt)
+  (define name (class-decl-name stmt))
+  (declare! r name)
+  (define! r name))
 
 (: resolve-var-expr! (-> Resolver VariableExpr Void))
 (define (resolve-var-expr! r expr)
