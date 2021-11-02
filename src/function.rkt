@@ -5,7 +5,7 @@
 
 (provide (all-defined-out))
 
-(struct function ([declaration : FunDecl] [closure : Env]))
+(struct function ([declaration : FunDecl] [closure : Env] [is-initalizer? : Boolean]))
 (define-type Function function)
 
 (struct return exn ([value : Any]))

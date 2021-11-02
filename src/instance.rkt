@@ -22,10 +22,10 @@
   (match-define (instance class fields) in)
   (define lexeme (token-lexeme name))
   (cond 
-    [(hash-has-key? fields name)
-     (hash-ref fields name)]
+    [(hash-has-key? fields lexeme)
+     (hash-ref fields lexeme)]
     [(class-has-method? class lexeme)
-     (bind (class-find-method class lexeme) in)]
+     (bind (assert (class-find-method class lexeme)) in)]
     [else 
      (raise-runtime-error name (format "Undefined property '~a'." lexeme))]))
 
@@ -38,10 +38,10 @@
 ; bound to the given instance.
 (: bind (-> Function Instance Function))
 (define (bind fun in)
-  (match-define (function declaration closure) fun)
+  (match-define (function declaration closure is-initalizer?) fun)
   (define env (make-env closure))
   (env-define env "this" in)
-  (function declaration env))
+  (function declaration env is-initalizer?))
 
 (: instance->string (-> Instance String))
 (define (instance->string instance)

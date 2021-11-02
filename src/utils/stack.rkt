@@ -7,7 +7,7 @@
 
 (: make-stack (All (A) (-> A * (Stackof A))))
 (define (make-stack . vals)
-  (stack (apply list vals) 0))
+  (stack vals (length vals)))
 
 (: stack-push! (All (A) (-> (Stackof A) A Void)))
 (define (stack-push! s x)

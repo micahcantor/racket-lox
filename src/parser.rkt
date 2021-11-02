@@ -194,14 +194,14 @@
     [(matches? p EQUAL)
      (define equals (previous p))
      (define value (parse-assignment p))
-     (unless (variable? expr)
-       (lox-error equals "Invalid assignment target."))
-     (assert expr variable?)
-     (assign (variable-name expr) value)]
-    [(get? expr)
-     (match-define (get object name) expr)
-     (define value (parse-assignment p))
-     (set-expr object name value)]
+     (match expr
+      [(variable name)
+       (assign name value)]
+      [(get object name)
+       (set-expr object name value)]
+      [else
+       (lox-error equals "Invalid assignment target.")
+       expr])]
     [else expr]))
 
 (: parse-or (-> Parser Expr))

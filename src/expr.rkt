@@ -28,7 +28,7 @@
 (struct set-expr expr ([object : Expr] [name : Token] [value : Expr]) #:transparent)
 (define-type SetExpr set-expr)
 
-(struct this-expr expr ([keyword : Token]))
+(struct this-expr expr ([keyword : Token]) #:transparent)
 (define-type ThisExpr this-expr)
 
 (struct unary expr ([operator : Token] [right : Expr]) #:transparent)

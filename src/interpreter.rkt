@@ -112,7 +112,8 @@
   (env-define env (token-lexeme name) null)
   (define class-methods : (HashTable String Function) (make-hash))
   (for ([method methods])
-    (define fun (function method env))
+    (define is-initalizer? (equal? "init" (token-lexeme (fun-decl-name method))))
+    (define fun (function method env is-initalizer?))
     (define name (token-lexeme (fun-decl-name method)))
     (hash-set! class-methods name fun))
   (define lox-class (make-class (token-lexeme name) class-methods))
@@ -121,7 +122,7 @@
 (: exec-fun-decl (-> Interpreter FunDecl Void))
 (define (exec-fun-decl i stmt)
   (define env (interpreter-env i))
-  (define fun (function stmt env))
+  (define fun (function stmt env #f))
   (define fun-name (token-lexeme (fun-decl-name stmt)))
   (env-define env fun-name fun))
 
@@ -144,6 +145,7 @@
     [(call? expr) (eval-call i expr)]
     [(get? expr) (eval-get i expr)]
     [(set-expr? expr) (eval-set-expr i expr)]
+    [(this-expr? expr) (eval-this-expr i expr)]
     [(binary? expr) (eval-binary i expr)]))
 
 (: eval-literal (-> Interpreter LiteralExpr Any))
@@ -286,38 +288,55 @@
 (: callable-call (-> Callable Interpreter (Vectorof Any) Any))
 (define (callable-call callee i args)
   (match callee
-    [(function _ _) (call-function callee i args)]
+    [(function _ _ _) (call-function callee i args)]
     [(native-function call-func _) (call-func callee i args)]
     [(class _ _) (call-class callee i args)]))
 
 (: callable-arity (-> Callable Natural))
 (define (callable-arity callee)
   (match callee
-    [(function (fun-decl _ params _) _) (vector-length params)]
+    [(function (fun-decl _ params _) _ _) (vector-length params)]
     [(native-function _ arity) arity]
-    [(class _ _) 0]))
+    [(class _ _) (class-arity callee)]))
 
 (: callable->string (-> Callable String))
 (define (callable->string callee)
   (match callee
-    [(function (fun-decl name _ _) _) (format "< ~a >" (token-lexeme name))]
+    [(function (fun-decl name _ _) _ _) (format "< ~a >" (token-lexeme name))]
     [(native-function _ _) "<native fn>"]
     [(class name _) name]))
 
 (: call-function (-> Function Interpreter (Vectorof Any) Any))
 (define (call-function func i args)
+  (match-define (function decl closure is-initalizer?) func)
   (define declaration (function-declaration func))
   (define env (make-env (function-closure func)))
   (define params (fun-decl-params declaration))
   (for ([param params] [arg args])
-    (env-define env (token-lexeme param) arg))interpreter-resolve!
-  (with-handlers ([return? return-value])
+    (env-define env (token-lexeme param) arg))
+  (: handle-return (-> Return Any))
+  (define (handle-return r)
+    (if is-initalizer?
+        (env-get-at closure 0 "this")
+        (return-value r)))
+  (with-handlers ([return? handle-return])
     (exec-block-stmt i (fun-decl-body declaration) env)
-    null))
+    (if is-initalizer?
+        (env-get-at closure 0 "this") ; return 'this'
+        null))) ; implicitly return null
 
 (: call-class (-> Class Interpreter (Vectorof Any) Any))
-(define (call-class class i args)
-  (make-instance class))
+(define (call-class c i args)
+  (define instance (make-instance c))
+  (define initializer (class-find-method c "init"))
+  (when initializer
+    (call-function (bind initializer instance) i args))
+  instance)
+
+(: class-arity (-> Class Natural))
+(define (class-arity c)
+  (define initializer (class-find-method c "init"))
+  (if initializer (callable-arity initializer) 0))
 
 (struct native-function ([call : (-> NativeFunction Interpreter (Vectorof Any) Any)] [arity : Natural]))
 (define-type NativeFunction native-function)

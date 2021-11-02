@@ -15,6 +15,6 @@
 (define (class-has-method? c name)
   (hash-has-key? (class-methods c) name))
 
-(: class-find-method (-> Class String Function))
+(: class-find-method (-> Class String (Option Function)))
 (define (class-find-method c name)
-  (hash-ref (class-methods c) name))
+  (hash-ref (class-methods c) name #f))

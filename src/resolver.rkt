@@ -13,17 +13,25 @@
 (define-type Resolver resolver)
 (struct resolver ([interpreter : Interpreter]
                   [scopes : (Stackof (HashTable String Boolean))]
-                  [current-function : FunctionType]) 
+                  [current-function : FunctionType]
+                  [current-class : ClassType]) 
                   #:mutable)
 
+#| Function Type |#
 (struct NONE ())
 (struct FUNCTION ())
+(struct INITIALIZER ())
 (struct METHOD ())
-(define-type FunctionType (U NONE FUNCTION METHOD))
+(define-type FunctionType (U NONE FUNCTION INITIALIZER METHOD))
+
+#| ClassType |#
+(struct CLASS ())
+(define-type ClassType (U NONE CLASS))
+
 
 (: make-resolver (-> Interpreter Resolver))
 (define (make-resolver i)
-  (resolver i (make-stack) (NONE)))
+  (resolver i (make-stack) (NONE) (NONE)))
 
 (: resolve-all! (-> Resolver (Listof Stmt) Void))
 (define (resolve-all! r stmts)
@@ -77,15 +85,21 @@
 (: resolve-class-decl! (-> Resolver ClassDecl Void))
 (define (resolve-class-decl! r stmt)
   (match-define (class-decl name methods) stmt)
+  (define enclosing-class (resolver-current-class r))
+  (set-resolver-current-class! r (CLASS))
   (declare! r name)
   (define! r name)
   (begin-scope! r)
   ; resolve "this" to a local variable within class body.
-  (hash-set (stack-top (resolver-scopes r)) "this" #t)
+  (hash-set! (stack-top (resolver-scopes r)) "this" #t)
   (for ([method methods])
-    (define declaration (METHOD))
+    (define declaration
+      (if (equal? "init" (token-lexeme (fun-decl-name method)))
+          (INITIALIZER)
+          (METHOD)))
     (resolve-function! r method declaration))
-  (end-scope! r))
+  (end-scope! r)
+  (set-resolver-current-class! r enclosing-class))
 
 (: resolve-var-expr! (-> Resolver VariableExpr Void))
 (define (resolve-var-expr! r expr)
@@ -120,10 +134,14 @@
 
 (: resolve-return-stmt! (-> Resolver ReturnStmt Void))
 (define (resolve-return-stmt! r stmt)
-  (when (equal? (resolver-current-function r) (NONE))
+  (define current-function (resolver-current-function r))
+  (when (equal? current-function (NONE))
     (lox-error (return-stmt-keyword stmt) "Can't return from top-level code."))
   (define value (return-stmt-value stmt))
-  (when value (resolve! r value)))
+  (when value 
+    (if (equal? current-function (INITIALIZER))
+        (lox-error (return-stmt-keyword stmt) "Can't return a value from an initializer.")
+        (resolve! r value))))
 
 (: resolve-while-stmt! (-> Resolver WhileStmt Void))
 (define (resolve-while-stmt! r stmt)
@@ -148,6 +166,7 @@
 (define (resolve-get-expr! r expr)
   (resolve! r (get-object expr)))
 
+; we don't resolve the caller because of dynamic dispatch.
 (: resolve-set-expr! (-> Resolver SetExpr Void))
 (define (resolve-set-expr! r expr)
   (resolve! r (set-expr-value expr))
@@ -155,11 +174,13 @@
 
 (: resolve-this-expr! (-> Resolver ThisExpr Void))
 (define (resolve-this-expr! r expr)
-  (resolve-local! r expr (this-expr-keyword expr)))
+  (define keyword (this-expr-keyword expr))
+  (if (equal? (resolver-current-class r) (NONE))
+      (lox-error keyword "Can't use 'this' outside of a class.")
+      (resolve-local! r expr keyword)))
 
 (: resolve-grouping-expr! (-> Resolver GroupingExpr Void))
 (define (resolve-grouping-expr! r expr)
-  ; we don't resolve the caller because of dynamic dispatch.
   (resolve! r (grouping-expression expr)))
 
 (: resolve-unary-expr! (-> Resolver UnaryExpr Void))
