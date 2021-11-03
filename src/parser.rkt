@@ -49,12 +49,15 @@
 (: parse-class-declaration (-> Parser ClassDecl))
 (define (parse-class-declaration p)
   (define name (consume! p IDENTIFIER "Expect class name."))
+  (define superclass
+    (and (matches? p LESS)
+         (variable (consume! p IDENTIFIER "Expect superclass name."))))
   (consume! p LEFT_BRACE "Expect '{' before class body.")
   (define methods : (Listof FunDecl) null)
   (while (and (not (check? p RIGHT_BRACE)) (not (at-end? p)))
-    (set! methods (cons (parse-fun-declaration p "method") methods)))
+         (set! methods (cons (parse-fun-declaration p "method") methods)))
   (consume! p RIGHT_BRACE "Expect '}' after class body.")
-  (class-decl name (reverse methods)))
+  (class-decl name superclass (reverse methods)))
 
 (: parse-fun-declaration (-> Parser String FunDecl))
 (define (parse-fun-declaration p kind)
@@ -195,13 +198,13 @@
      (define equals (previous p))
      (define value (parse-assignment p))
      (match expr
-      [(variable name)
-       (assign name value)]
-      [(get object name)
-       (set-expr object name value)]
-      [else
-       (lox-error equals "Invalid assignment target.")
-       expr])]
+       [(variable name)
+        (assign name value)]
+       [(get object name)
+        (set-expr object name value)]
+       [else
+        (lox-error equals "Invalid assignment target.")
+        expr])]
     [else expr]))
 
 (: parse-or (-> Parser Expr))
@@ -253,7 +256,7 @@
       [(matches? p DOT)
        (define name (consume! p IDENTIFIER "Expect property name after '.'."))
        (loop (get expr name))]
-      [else expr])))  
+      [else expr])))
 
 (: finish-call (-> Parser Expr Expr))
 (define (finish-call p callee)
@@ -284,6 +287,11 @@
      (literal (token-literal (previous p)))]
     [(matches? p IDENTIFIER)
      (variable (previous p))]
+    [(matches? p SUPER)
+     (define keyword (previous p))
+     (consume! p DOT "Expect '.' after 'super'.")
+     (define method (consume! p IDENTIFIER "Expect superclass method name."))
+     (super-expr keyword method)]
     [(matches? p THIS)
      (this-expr (previous p))]
     [(matches? p LEFT_PAREN)

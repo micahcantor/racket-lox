@@ -57,6 +57,7 @@
     [(call? val) (resolve-call-expr! r val)]
     [(get? val) (resolve-get-expr! r val)]
     [(set-expr? val) (resolve-set-expr! r val)]
+    [(super-expr? val) (resolve-super-expr! r val)]
     [(this-expr? val) (resolve-this-expr! r val)]
     [(grouping? val) (resolve-grouping-expr! r val)]
     [(literal? val) (resolve-literal-expr!)]))
@@ -84,11 +85,18 @@
 
 (: resolve-class-decl! (-> Resolver ClassDecl Void))
 (define (resolve-class-decl! r stmt)
-  (match-define (class-decl name methods) stmt)
+  (match-define (class-decl name superclass methods) stmt)
   (define enclosing-class (resolver-current-class r))
   (set-resolver-current-class! r (CLASS))
   (declare! r name)
   (define! r name)
+  (when superclass
+    (if (equal? (token-lexeme (variable-name superclass))
+                (token-lexeme (class-decl-name stmt)))
+        (lox-error (variable-name superclass) "A class can't inherit from itself.")
+        (resolve! r superclass))
+    (begin-scope! r)
+    (hash-set! (stack-top (resolver-scopes r)) "super" #t))
   (begin-scope! r)
   ; resolve "this" to a local variable within class body.
   (hash-set! (stack-top (resolver-scopes r)) "this" #t)
@@ -99,6 +107,7 @@
           (METHOD)))
     (resolve-function! r method declaration))
   (end-scope! r)
+  (when superclass (end-scope! r))
   (set-resolver-current-class! r enclosing-class))
 
 (: resolve-var-expr! (-> Resolver VariableExpr Void))
@@ -166,11 +175,14 @@
 (define (resolve-get-expr! r expr)
   (resolve! r (get-object expr)))
 
-; we don't resolve the caller because of dynamic dispatch.
 (: resolve-set-expr! (-> Resolver SetExpr Void))
 (define (resolve-set-expr! r expr)
   (resolve! r (set-expr-value expr))
   (resolve! r (set-expr-object expr)))
+
+(: resolve-super-expr! (-> Resolver SuperExpr Void))
+(define (resolve-super-expr! r expr)
+  (resolve-local! r expr (super-expr-keyword expr)))
 
 (: resolve-this-expr! (-> Resolver ThisExpr Void))
 (define (resolve-this-expr! r expr)

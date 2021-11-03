@@ -19,7 +19,7 @@
 (struct fun-decl stmt ([name : Token] [params : (Vectorof Token)] [body : BlockStmt]) #:transparent)
 (define-type FunDecl fun-decl)
 
-(struct class-decl stmt ([name : Token] [methods : (Listof FunDecl)]) #:transparent)
+(struct class-decl stmt ([name : Token] [superclass : (Option VariableExpr)] [methods : (Listof FunDecl)]) #:transparent)
 (define-type ClassDecl class-decl)
 
 (struct block-stmt stmt ([statements : (Listof Stmt)]) #:transparent)

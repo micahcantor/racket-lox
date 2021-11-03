@@ -107,16 +107,28 @@
 
 (: exec-class-decl (-> Interpreter ClassDecl Void))
 (define (exec-class-decl i stmt)
-  (match-define (class-decl name methods) stmt)
+  (match-define (class-decl name stmt-superclass methods) stmt)
+  (define superclass : (Option Class)
+    (cond
+      [stmt-superclass 
+       (define evaluated (evaluate i stmt-superclass))
+       (unless (class? evaluated)
+        (raise-runtime-error (variable-name stmt-superclass) "Superclass must be a class."))
+       (assert evaluated class?)]
+      [else #f]))
   (define env (interpreter-env i))
   (env-define env (token-lexeme name) null)
+  (when stmt-superclass
+    (set! env (make-env env))
+    (env-define env "super" superclass))
   (define class-methods : (HashTable String Function) (make-hash))
   (for ([method methods])
     (define is-initalizer? (equal? "init" (token-lexeme (fun-decl-name method))))
     (define fun (function method env is-initalizer?))
     (define name (token-lexeme (fun-decl-name method)))
     (hash-set! class-methods name fun))
-  (define lox-class (make-class (token-lexeme name) class-methods))
+  (define lox-class (make-class (token-lexeme name) superclass class-methods))
+  (when superclass (set! env (assert (env-enclosing env))))
   (env-assign env name lox-class))
 
 (: exec-fun-decl (-> Interpreter FunDecl Void))
@@ -145,6 +157,7 @@
     [(call? expr) (eval-call i expr)]
     [(get? expr) (eval-get i expr)]
     [(set-expr? expr) (eval-set-expr i expr)]
+    [(super-expr? expr) (eval-super-expr i expr)]
     [(this-expr? expr) (eval-this-expr i expr)]
     [(binary? expr) (eval-binary i expr)]))
 
@@ -224,6 +237,19 @@
     [else
      (raise-runtime-error expr-name "Only instance have fields.")]))
 
+(: eval-super-expr (-> Interpreter SuperExpr Any))
+(define (eval-super-expr i expr)
+  (define method-name (token-lexeme (super-expr-method expr)))
+  (define distance (hash-ref (interpreter-locals i) expr))
+  (define superclass 
+    (cast (env-get-at (interpreter-env i) distance "super") Class))
+  (define object 
+    (cast (env-get-at (interpreter-env i) (sub1 distance) "this") Instance))
+  (define method (class-find-method superclass method-name))
+  (if method
+      (bind method object)
+      (raise-runtime-error (super-expr-method expr) (format "Undefined property '~a'." method-name))))
+
 (: eval-this-expr (-> Interpreter ThisExpr Any))
 (define (eval-this-expr i expr)
   (lookup-variable i (this-expr-keyword expr) expr))
@@ -290,21 +316,21 @@
   (match callee
     [(function _ _ _) (call-function callee i args)]
     [(native-function call-func _) (call-func callee i args)]
-    [(class _ _) (call-class callee i args)]))
+    [(class _ _ _) (call-class callee i args)]))
 
 (: callable-arity (-> Callable Natural))
 (define (callable-arity callee)
   (match callee
     [(function (fun-decl _ params _) _ _) (vector-length params)]
     [(native-function _ arity) arity]
-    [(class _ _) (class-arity callee)]))
+    [(class _ _ _) (class-arity callee)]))
 
 (: callable->string (-> Callable String))
 (define (callable->string callee)
   (match callee
     [(function (fun-decl name _ _) _ _) (format "< ~a >" (token-lexeme name))]
     [(native-function _ _) "<native fn>"]
-    [(class name _) name]))
+    [(class name _ _) name]))
 
 (: call-function (-> Function Interpreter (Vectorof Any) Any))
 (define (call-function func i args)
