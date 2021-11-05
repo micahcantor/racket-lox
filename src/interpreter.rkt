@@ -242,9 +242,11 @@
   (define method-name (token-lexeme (super-expr-method expr)))
   (define distance (hash-ref (interpreter-locals i) expr))
   (define superclass 
-    (cast (env-get-at (interpreter-env i) distance "super") Class))
+    (env-get-at (interpreter-env i) distance "super"))
   (define object 
-    (cast (env-get-at (interpreter-env i) (sub1 distance) "this") Instance))
+    (env-get-at (interpreter-env i) (sub1 distance) "this"))
+  (assert superclass class?)
+  (assert object instance?)
   (define method (class-find-method superclass method-name))
   (if method
       (bind method object)

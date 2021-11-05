@@ -10,7 +10,7 @@
 (provide (all-defined-out))
 
 (define-type Instance instance)
-(struct instance ([class : Class] [fields : (HashTable String Any)]))
+(struct instance ([class : Class] [fields : (HashTable String Any)]) #:transparent)
 
 (: make-instance (-> Class Instance))
 (define (make-instance class)
@@ -21,11 +21,12 @@
 (define (instance-get in name)
   (match-define (instance class fields) in)
   (define lexeme (token-lexeme name))
+  (define method (class-find-method class lexeme))
   (cond 
     [(hash-has-key? fields lexeme)
      (hash-ref fields lexeme)]
-    [(class-has-method? class lexeme)
-     (bind (assert (class-find-method class lexeme)) in)]
+    [method
+     (bind method in)]
     [else 
      (raise-runtime-error name (format "Undefined property '~a'." lexeme))]))
 

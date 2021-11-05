@@ -1,6 +1,6 @@
 #lang typed/racket/base
 
-(require (only-in racket/match match-define))
+(require racket/match)
 (require "utils/stack.rkt")
 (require "error.rkt")
 (require "interpreter.rkt")
@@ -26,7 +26,8 @@
 
 #| ClassType |#
 (struct CLASS ())
-(define-type ClassType (U NONE CLASS))
+(struct SUBCLASS ())
+(define-type ClassType (U NONE CLASS SUBCLASS))
 
 
 (: make-resolver (-> Interpreter Resolver))
@@ -91,6 +92,7 @@
   (declare! r name)
   (define! r name)
   (when superclass
+    (set-resolver-current-class! r (SUBCLASS))
     (if (equal? (token-lexeme (variable-name superclass))
                 (token-lexeme (class-decl-name stmt)))
         (lox-error (variable-name superclass) "A class can't inherit from itself.")
@@ -182,7 +184,14 @@
 
 (: resolve-super-expr! (-> Resolver SuperExpr Void))
 (define (resolve-super-expr! r expr)
-  (resolve-local! r expr (super-expr-keyword expr)))
+  (define keyword (super-expr-keyword expr))
+  (match (resolver-current-class r)
+    [(NONE)
+     (lox-error keyword "Can't use 'super' outside of a class.")]
+    [(CLASS)
+     (lox-error keyword "Can't use 'super' in a class with no superclass.")]
+    [else 
+     (resolve-local! r expr keyword)]))
 
 (: resolve-this-expr! (-> Resolver ThisExpr Void))
 (define (resolve-this-expr! r expr)
