@@ -18,21 +18,21 @@
                   #:mutable)
 
 #| Function Type |#
-(struct NONE ())
-(struct FUNCTION ())
-(struct INITIALIZER ())
-(struct METHOD ())
-(define-type FunctionType (U NONE FUNCTION INITIALIZER METHOD))
+(struct none ())
+(struct function ())
+(struct initializer ())
+(struct method ())
+(define-type FunctionType (U none function initializer method))
 
 #| ClassType |#
-(struct CLASS ())
-(struct SUBCLASS ())
-(define-type ClassType (U NONE CLASS SUBCLASS))
+(struct class ())
+(struct subclass ())
+(define-type ClassType (U none class subclass))
 
 
 (: make-resolver (-> Interpreter Resolver))
 (define (make-resolver i)
-  (resolver i (make-stack) (NONE) (NONE)))
+  (resolver i (make-stack) (none) (none)))
 
 (: resolve-all! (-> Resolver (Listof Stmt) Void))
 (define (resolve-all! r stmts)
@@ -82,17 +82,17 @@
   (define name (fun-decl-name stmt))
   (declare! r name)
   (define! r name)
-  (resolve-function! r stmt (FUNCTION)))
+  (resolve-function! r stmt (function)))
 
 (: resolve-class-decl! (-> Resolver ClassDecl Void))
 (define (resolve-class-decl! r stmt)
   (match-define (class-decl name superclass methods) stmt)
   (define enclosing-class (resolver-current-class r))
-  (set-resolver-current-class! r (CLASS))
+  (set-resolver-current-class! r (class))
   (declare! r name)
   (define! r name)
   (when superclass
-    (set-resolver-current-class! r (SUBCLASS))
+    (set-resolver-current-class! r (subclass))
     (if (equal? (token-lexeme (variable-name superclass))
                 (token-lexeme (class-decl-name stmt)))
         (lox-error (variable-name superclass) "A class can't inherit from itself.")
@@ -102,12 +102,12 @@
   (begin-scope! r)
   ; resolve "this" to a local variable within class body.
   (hash-set! (stack-top (resolver-scopes r)) "this" #t)
-  (for ([method methods])
+  (for ([m methods])
     (define declaration
-      (if (equal? "init" (token-lexeme (fun-decl-name method)))
-          (INITIALIZER)
-          (METHOD)))
-    (resolve-function! r method declaration))
+      (if (equal? "init" (token-lexeme (fun-decl-name m)))
+          (initializer)
+          (method)))
+    (resolve-function! r m declaration))
   (end-scope! r)
   (when superclass (end-scope! r))
   (set-resolver-current-class! r enclosing-class))
@@ -146,11 +146,11 @@
 (: resolve-return-stmt! (-> Resolver ReturnStmt Void))
 (define (resolve-return-stmt! r stmt)
   (define current-function (resolver-current-function r))
-  (when (equal? current-function (NONE))
+  (when (none? current-function)
     (lox-error (return-stmt-keyword stmt) "Can't return from top-level code."))
   (define value (return-stmt-value stmt))
   (when value 
-    (if (equal? current-function (INITIALIZER))
+    (if (initializer? current-function)
         (lox-error (return-stmt-keyword stmt) "Can't return a value from an initializer.")
         (resolve! r value))))
 
@@ -186,9 +186,9 @@
 (define (resolve-super-expr! r expr)
   (define keyword (super-expr-keyword expr))
   (match (resolver-current-class r)
-    [(NONE)
+    [(none)
      (lox-error keyword "Can't use 'super' outside of a class.")]
-    [(CLASS)
+    [(class)
      (lox-error keyword "Can't use 'super' in a class with no superclass.")]
     [else 
      (resolve-local! r expr keyword)]))
@@ -196,7 +196,7 @@
 (: resolve-this-expr! (-> Resolver ThisExpr Void))
 (define (resolve-this-expr! r expr)
   (define keyword (this-expr-keyword expr))
-  (if (equal? (resolver-current-class r) (NONE))
+  (if (none? (resolver-current-class r))
       (lox-error keyword "Can't use 'this' outside of a class.")
       (resolve-local! r expr keyword)))
 
