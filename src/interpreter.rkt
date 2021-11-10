@@ -30,9 +30,7 @@
 
 (: interpret! (-> Interpreter (Listof Stmt) Void))
 (define (interpret! i statements)
-  (: handle-runtime-error (-> RuntimeError Void))
-  (define (handle-runtime-error e) (displayln (runtime-error-message e)))
-  (with-handlers ([exn:runtime-error? handle-runtime-error])
+  (with-handlers ([exn:runtime-error? runtime-error])
     (for ([statement statements])
       (execute i statement))))
 
@@ -330,7 +328,7 @@
 (: callable->string (-> Callable String))
 (define (callable->string callee)
   (match callee
-    [(function (fun-decl name _ _) _ _) (format "< ~a >" (token-lexeme name))]
+    [(function (fun-decl name _ _) _ _) (format "<fn ~a>" (token-lexeme name))]
     [(native-function _ _) "<native fn>"]
     [(class name _ _) name]))
 

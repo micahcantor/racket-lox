@@ -41,20 +41,24 @@
 (struct exn:runtime-error exn:fail ([token : Token]) #:transparent)
 (define-type RuntimeError exn:runtime-error)
 
-(: make-runtime-error (-> Token String exn:runtime-error))
+(: make-runtime-error (-> Token String RuntimeError))
 (define (make-runtime-error token message)
   (exn:runtime-error message (current-continuation-marks) token))
 
-(: raise-runtime-error (-> Token String exn:runtime-error))
+(: raise-runtime-error (-> Token String RuntimeError))
 (define (raise-runtime-error token message)
-  (set-had-runtime-error! #t)
   (raise (make-runtime-error token message)))
+
+(: runtime-error (-> RuntimeError Void))
+(define (runtime-error e)
+  (set-had-runtime-error! #t)
+  (displayln (runtime-error-message e) (current-error-port)))
 
 (: runtime-error-message (-> RuntimeError String))
 (define (runtime-error-message e)
-  (format "[line ~a] ~a"
-          (token-line (exn:runtime-error-token e))
-          (exn-message e)))
+  (format "~a\n[line ~a]"
+          (exn-message e)
+          (token-line (exn:runtime-error-token e))))
 
 (: raise-undefined-variable-error (-> Token String exn:runtime-error))
 (define (raise-undefined-variable-error name lexeme)
@@ -72,7 +76,7 @@
 
 (: report-error (->* (Integer String) (String) Void))
 (define (report-error line message [where ""])
-  (displayln (lox-error-message line where message))
+  (displayln (lox-error-message line where message) (current-error-port))
   (set-had-error! #t))
 
 (: lox-error-message (->* (Integer String) (String) String))

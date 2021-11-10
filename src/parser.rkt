@@ -296,10 +296,10 @@
      (this-expr (previous p))]
     [(matches? p LEFT_PAREN)
      (define expr (parse-expression p)) ; parse the following expression
-     (consume! p RIGHT_PAREN "Expect ')' after expression")
+     (consume! p RIGHT_PAREN "Expect ')' after expression.")
      (grouping expr)]
     [else
-     (raise-parse-error (peek p) "Expect expression")
+     (raise-parse-error (peek p) "Expect expression.")
      (expr)]))
 
 ; (left-assosiative-binary parser (parser -> token) (listof Token-type)) -> token

@@ -1,5 +1,6 @@
 #lang typed/racket/base
 
+(require racket/match)
 (require "error.rkt")
 (require "token.rkt")
 
@@ -22,8 +23,6 @@
 (define (env-get e name)
   (define lexeme (token-lexeme name))
   (define-values (val _) (env-member e name))
-  (unless val
-    (raise-undefined-variable-error name lexeme))
   val)
 
 (: env-get-at (-> Env Integer String Any))
@@ -43,8 +42,6 @@
   (define lexeme (token-lexeme name))
   (define-values (variable defined-env)
     (env-member e name))
-  (unless variable
-    (raise-undefined-variable-error name lexeme))
   (env-define defined-env lexeme value))
 
 (: env-assign-at (-> Env Integer Token Any Void))
@@ -54,10 +51,12 @@
 
 (: env-member (-> Env Token (Values Any Env)))
 (define (env-member e name)
-  (define val (hash-ref (env-values e) (token-lexeme name) #f))
+  (match-define (env env-values enclosing) e)
+  (define lexeme (token-lexeme name))
   (cond
-    [val (values val e)]
-    [(env-enclosing e) (env-member (env-enclosing e) name)]
+    [(hash-has-key? env-values lexeme)
+     (values (hash-ref env-values lexeme) e)]
+    [enclosing (env-member enclosing name)]
     [else 
-      (raise-undefined-variable-error name (token-lexeme name))
+      (raise-undefined-variable-error name lexeme)
       (values null (make-env))]))
