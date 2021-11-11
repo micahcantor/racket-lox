@@ -91,9 +91,7 @@
   (for ([param (fun-decl-params function)])
     (declare! r param)
     (define! r param))
-  (define body-stmts (block-stmt-statements (fun-decl-body function)))
-  (for ([stmt body-stmts])
-    (resolve! r stmt))
+  (resolve! r (fun-decl-body function))
   (end-scope! r)
   (set-resolver-current-function! r enclosing-function))
 
@@ -254,7 +252,7 @@
   (define interpreter (resolver-interpreter r))
   (match-define (stack data size) (resolver-scopes r))
   (for/or ([scope (reverse data)]
-           [i (in-naturals)]
+           [i (in-range (sub1 size) -1 -1)]
            #:when (hash-has-key? scope (token-lexeme name)))
-    (interpreter-resolve! interpreter expr (- size i 2)))
+    (interpreter-resolve! interpreter expr (- size 1 i)))
   (void))
