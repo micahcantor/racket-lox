@@ -1,0 +1,4 @@
+var outer = "outer";
+{
+  print outer;
+}

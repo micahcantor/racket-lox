@@ -66,7 +66,7 @@
   (define params (parse-parameters p))
   (consume! p RIGHT_PAREN "Expect ')' after parameters.")
   (consume! p LEFT_BRACE (format "Expect '{' before ~a body." kind))
-  (define body (parse-block-statement p))
+  (define body (parse-block p))
   (fun-decl name params body))
 
 (: parse-parameters (-> Parser (Vectorof Token)))
@@ -114,12 +114,16 @@
 
 (: parse-block-statement (-> Parser BlockStmt))
 (define (parse-block-statement p)
+  (block-stmt (parse-block p)))
+
+(: parse-block (-> Parser (Listof Stmt)))
+(define (parse-block p)
   (: stmts (Listof Stmt))
   (define stmts null)
   (while (and (not (check? p RIGHT_BRACE)) (not (at-end? p)))
          (set! stmts (cons (parse-declaration p) stmts)))
   (consume! p RIGHT_BRACE "Expect '}' after block.")
-  (block-stmt (reverse stmts)))
+  (reverse stmts))
 
 (: parse-if-statement (-> Parser IfStmt))
 (define (parse-if-statement p)
