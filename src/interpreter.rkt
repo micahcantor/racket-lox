@@ -72,7 +72,6 @@
 
 (: exec-block (-> Interpreter (Listof Stmt) Env Void))
 (define (exec-block i statements env)
-  (println env)
   (define previous (interpreter-env i))
   (: handle-return (-> Return Any))
   (define (handle-return v)
@@ -176,7 +175,6 @@
 (define (lookup-variable i name expr)
   (match-define (interpreter env globals locals) i)
   (define distance (hash-ref locals expr #f))
-  (printf "dist: ~a, name: ~a\n" distance name)
   (if distance
       (env-get-at env distance (token-lexeme name))
       (env-get globals name)))
