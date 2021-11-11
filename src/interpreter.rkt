@@ -17,7 +17,7 @@
 
 (define-type Interpreter interpreter)
 (struct interpreter ([env : Env]
-                     [globals : Env] 
+                     [globals : Env]
                      [locals : (HashTable Expr Integer)]) #:mutable)
 
 (: make-interpreter (-> Interpreter))
@@ -108,10 +108,10 @@
   (match-define (class-decl name stmt-superclass methods) stmt)
   (define superclass : (Option Class)
     (cond
-      [stmt-superclass 
+      [stmt-superclass
        (define evaluated (evaluate i stmt-superclass))
        (unless (class? evaluated)
-        (raise-runtime-error (variable-name stmt-superclass) "Superclass must be a class."))
+         (raise-runtime-error (variable-name stmt-superclass) "Superclass must be a class."))
        (assert evaluated class?)]
       [else #f]))
   (define env (interpreter-env i))
@@ -239,9 +239,9 @@
 (define (eval-super-expr i expr)
   (define method-name (token-lexeme (super-expr-method expr)))
   (define distance (hash-ref (interpreter-locals i) expr))
-  (define superclass 
+  (define superclass
     (env-get-at (interpreter-env i) distance "super"))
-  (define object 
+  (define object
     (env-get-at (interpreter-env i) (sub1 distance) "this"))
   (assert superclass class?)
   (assert object instance?)
@@ -334,10 +334,8 @@
 
 (: call-function (-> Function Interpreter (Vectorof Any) Any))
 (define (call-function func i args)
-  (match-define (function decl closure is-initalizer?) func)
-  (define declaration (function-declaration func))
+  (match-define (function (fun-decl _ params body) closure is-initalizer?) func)
   (define env (make-env (function-closure func)))
-  (define params (fun-decl-params declaration))
   (for ([param params] [arg args])
     (env-define env (token-lexeme param) arg))
   (: handle-return (-> Return Any))
@@ -346,7 +344,7 @@
         (env-get-at closure 0 "this")
         (return-value r)))
   (with-handlers ([return? handle-return])
-    (exec-block-stmt i (fun-decl-body declaration) env)
+    (exec-block-stmt i body env)
     (if is-initalizer?
         (env-get-at closure 0 "this") ; return 'this'
         null))) ; implicitly return null
