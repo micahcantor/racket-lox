@@ -6,7 +6,7 @@
 (provide (all-defined-out))
 
 (define-type Class class)
-(struct class ([name : String] [superclass : (Option Class)] [methods : (HashTable String Function)]) #:transparent)
+(struct class ([name : String] [superclass : (Option Class)] [methods : (HashTable String Function)]))
 
 (: make-class (-> String (Option Class) (HashTable String Function) Class))
 (define (make-class name superclass methods)

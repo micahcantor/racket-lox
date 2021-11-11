@@ -21,7 +21,7 @@
 
 (struct parser ([tokens : (Vectorof Token)]
                 [current : Integer])
-  #:mutable #:transparent)
+  #:mutable)
 
 (define-type Parser parser)
 
@@ -66,7 +66,7 @@
   (define params (parse-parameters p))
   (consume! p RIGHT_PAREN "Expect ')' after parameters.")
   (consume! p LEFT_BRACE (format "Expect '{' before ~a body." kind))
-  (define body (parse-block-statement p))
+  (define body (parse-block p))
   (fun-decl name params body))
 
 (: parse-parameters (-> Parser (Vectorof Token)))
@@ -114,12 +114,16 @@
 
 (: parse-block-statement (-> Parser BlockStmt))
 (define (parse-block-statement p)
+  (block-stmt (parse-block p)))
+
+(: parse-block (-> Parser (Listof Stmt)))
+(define (parse-block p)
   (: stmts (Listof Stmt))
   (define stmts null)
   (while (and (not (check? p RIGHT_BRACE)) (not (at-end? p)))
          (set! stmts (cons (parse-declaration p) stmts)))
   (consume! p RIGHT_BRACE "Expect '}' after block.")
-  (block-stmt (reverse stmts)))
+  (reverse stmts))
 
 (: parse-if-statement (-> Parser IfStmt))
 (define (parse-if-statement p)
@@ -163,10 +167,29 @@
   (when increment
     (set! body
           (block-stmt (list body (expression-stmt increment)))))
+  (unless condition (set! condition (literal #t)))
   (set! body (while-stmt condition body))
   (when initializer
     (set! body (block-stmt (list initializer body))))
   body)
+
+#| 
+  (block-stmt 
+    (list (var-decl (token 'IDENTIFIER "i" '() 3) (literal 0)) 
+          (while-stmt 
+            (binary (variable (token 'IDENTIFIER "i" '() 3)) (token 'LESS "<" '() 3) (literal 10)) 
+            (block-stmt 
+              (list (block-stmt (list (print-stmt (variable (token 'IDENTIFIER "i" '() 4))))) 
+                    (expression-stmt (assign ...)))))))
+
+  (block-stmt 
+      (list (var-decl (token 'IDENTIFIER "i" '() 2) (literal 0)) 
+            (while-stmt 
+              (binary (variable (token 'IDENTIFIER "i" '() 3)) (token 'LESS "<" '() 3) (literal 10)) 
+              (block-stmt 
+                (list (print-stmt (variable (token 'IDENTIFIER "i" '() 4))) 
+                      (expression-stmt (assign ...)))))))
+ |#
 
 (: parse-return-statement (-> Parser ReturnStmt))
 (define (parse-return-statement p)
