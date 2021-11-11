@@ -73,16 +73,29 @@
 (define (resolve-var-decl! r stmt)
   (match-define (var-decl name initializer) stmt)
   (declare! r name)
-  (when initializer
-    (resolve! r initializer))
+  (when initializer (resolve! r initializer))
   (define! r name))
 
 (: resolve-fun-decl! (-> Resolver FunDecl Void))
 (define (resolve-fun-decl! r stmt)
   (define name (fun-decl-name stmt))
   (declare! r name)
-  (define! r name)
+  (define! r name) ; define the function name before resolving the body
   (resolve-function! r stmt (function)))
+
+(: resolve-function! (-> Resolver FunDecl FunctionType Void))
+(define (resolve-function! r function type)
+  (define enclosing-function (resolver-current-function r))
+  (set-resolver-current-function! r type)
+  (begin-scope! r)
+  (for ([param (fun-decl-params function)])
+    (declare! r param)
+    (define! r param))
+  (define body-stmts (block-stmt-statements (fun-decl-body function)))
+  (for ([stmt body-stmts])
+    (resolve! r stmt))
+  (end-scope! r)
+  (set-resolver-current-function! r enclosing-function))
 
 (: resolve-class-decl! (-> Resolver ClassDecl Void))
 (define (resolve-class-decl! r stmt)
@@ -118,7 +131,7 @@
   (define name (variable-name expr))
   (when (and (not (stack-empty? scopes))
              (hash-has-key? (stack-top scopes) (token-lexeme name))
-             (not (hash-ref (stack-top scopes) (token-lexeme name))))
+             (not (hash-ref (stack-top scopes) (token-lexeme name)))) ; variable has been declared but not defined
     (lox-error name "Can't read local variable in its own initializer."))
   (resolve-local! r expr name))
 
@@ -245,15 +258,3 @@
            #:when (hash-has-key? scope (token-lexeme name)))
     (interpreter-resolve! interpreter expr (- size i 2)))
   (void))
-
-(: resolve-function! (-> Resolver FunDecl FunctionType Void))
-(define (resolve-function! r function type)
-  (define enclosing-function (resolver-current-function r))
-  (set-resolver-current-function! r type)
-  (begin-scope! r)
-  (for ([param (fun-decl-params function)])
-    (declare! r param)
-    (define! r param))
-  (resolve! r (fun-decl-body function))
-  (end-scope! r)
-  (set-resolver-current-function! r enclosing-function))
