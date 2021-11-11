@@ -71,15 +71,19 @@
 
 (: parse-parameters (-> Parser (Vectorof Token)))
 (define (parse-parameters p)
-  (let loop ([params : (Listof Token) null] [num : Natural 0])
-    (cond
-      [(check? p RIGHT_PAREN) ((inst list->vector Token) (reverse params))]
-      [(matches? p COMMA) (loop params num)]
-      [else
-       (when (>= num 255)
-         (make-parse-error (peek p) "Can't have more than 255 parameters."))
-       (define next-id (consume! p IDENTIFIER "Expect parameter name."))
-       (loop (cons next-id params) (add1 num))])))
+  (define params : (Listof Token) null)
+  (define paramc : Natural 0)
+  (define (add-param!)
+    (define name (consume! p IDENTIFIER "Expect parameter name."))
+    (set! params (cons name params))
+    (set! paramc (add1 paramc)))
+  (unless (check? p RIGHT_PAREN)
+    (add-param!)
+    (while (matches? p COMMA)
+           (when (>= paramc 255)
+             (lox-error (peek p) "Can't have more than 255 parameters."))
+           (add-param!)))
+  (list->vector (reverse params)))
 
 (: parse-var-declaration (-> Parser VarDecl))
 (define (parse-var-declaration p)
@@ -267,9 +271,9 @@
     (set! argc (add1 argc)))
   (unless (check? p RIGHT_PAREN)
     (add-arg!)
-    (when (>= argc 255)
-      (make-parse-error (peek p) "Can't have more than 255 arguments"))
     (while (matches? p COMMA)
+           (when (>= argc 255)
+             (lox-error (peek p) "Can't have more than 255 arguments."))
            (add-arg!)))
   (define paren (consume! p RIGHT_PAREN "Expect ')' after arguments."))
   (call callee paren (reverse args)))
