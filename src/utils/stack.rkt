@@ -3,7 +3,7 @@
 (provide (all-defined-out))
 
 (define-type Stackof stack)
-(struct (A) stack ([data : (Listof A)] [size : Integer]) #:mutable #:transparent)
+(struct (A) stack ([data : (Listof A)] [size : Integer]) #:mutable)
 
 (: make-stack (All (A) (-> A * (Stackof A))))
 (define (make-stack . vals)

@@ -21,7 +21,7 @@
 
 (struct parser ([tokens : (Vectorof Token)]
                 [current : Integer])
-  #:mutable #:transparent)
+  #:mutable)
 
 (define-type Parser parser)
 
@@ -167,10 +167,29 @@
   (when increment
     (set! body
           (block-stmt (list body (expression-stmt increment)))))
+  (unless condition (set! condition (literal #t)))
   (set! body (while-stmt condition body))
   (when initializer
     (set! body (block-stmt (list initializer body))))
   body)
+
+#| 
+  (block-stmt 
+    (list (var-decl (token 'IDENTIFIER "i" '() 3) (literal 0)) 
+          (while-stmt 
+            (binary (variable (token 'IDENTIFIER "i" '() 3)) (token 'LESS "<" '() 3) (literal 10)) 
+            (block-stmt 
+              (list (block-stmt (list (print-stmt (variable (token 'IDENTIFIER "i" '() 4))))) 
+                    (expression-stmt (assign ...)))))))
+
+  (block-stmt 
+      (list (var-decl (token 'IDENTIFIER "i" '() 2) (literal 0)) 
+            (while-stmt 
+              (binary (variable (token 'IDENTIFIER "i" '() 3)) (token 'LESS "<" '() 3) (literal 10)) 
+              (block-stmt 
+                (list (print-stmt (variable (token 'IDENTIFIER "i" '() 4))) 
+                      (expression-stmt (assign ...)))))))
+ |#
 
 (: parse-return-statement (-> Parser ReturnStmt))
 (define (parse-return-statement p)

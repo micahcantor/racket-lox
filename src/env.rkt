@@ -7,8 +7,7 @@
 (provide (all-defined-out))
 
 (struct env ([values : (HashTable String Any)]
-             [enclosing : (Option Env)])
-  #:transparent)
+             [enclosing : (Option Env)]))
 (define-type Env env)
 
 (: make-env (->* () (Env) Env))

@@ -38,7 +38,7 @@
 
 #| Runtime errors |#
 
-(struct exn:runtime-error exn:fail ([token : Token]) #:transparent)
+(struct exn:runtime-error exn:fail ([token : Token]))
 (define-type RuntimeError exn:runtime-error)
 
 (: make-runtime-error (-> Token String RuntimeError))

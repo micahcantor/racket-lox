@@ -8,8 +8,7 @@
                [lexeme : String] 
                [literal : Lox-Literal] 
                [line : Integer])
-  #:mutable
-  #:transparent)
+  #:mutable)
 
 (define-type Token token)
 

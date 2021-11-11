@@ -10,7 +10,7 @@
 (provide (all-defined-out))
 
 (define-type Instance instance)
-(struct instance ([class : Class] [fields : (HashTable String Any)]) #:transparent)
+(struct instance ([class : Class] [fields : (HashTable String Any)]))
 
 (: make-instance (-> Class Instance))
 (define (make-instance class)
