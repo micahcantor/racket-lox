@@ -173,24 +173,6 @@
     (set! body (block-stmt (list initializer body))))
   body)
 
-#| 
-  (block-stmt 
-    (list (var-decl (token 'IDENTIFIER "i" '() 3) (literal 0)) 
-          (while-stmt 
-            (binary (variable (token 'IDENTIFIER "i" '() 3)) (token 'LESS "<" '() 3) (literal 10)) 
-            (block-stmt 
-              (list (block-stmt (list (print-stmt (variable (token 'IDENTIFIER "i" '() 4))))) 
-                    (expression-stmt (assign ...)))))))
-
-  (block-stmt 
-      (list (var-decl (token 'IDENTIFIER "i" '() 2) (literal 0)) 
-            (while-stmt 
-              (binary (variable (token 'IDENTIFIER "i" '() 3)) (token 'LESS "<" '() 3) (literal 10)) 
-              (block-stmt 
-                (list (print-stmt (variable (token 'IDENTIFIER "i" '() 4))) 
-                      (expression-stmt (assign ...)))))))
- |#
-
 (: parse-return-statement (-> Parser ReturnStmt))
 (define (parse-return-statement p)
   (define keyword (previous p))
@@ -310,8 +292,10 @@
      (literal #t)]
     [(matches? p NIL)
      (literal null)]
-    [(matches? p NUMBER STRING)
+    [(matches? p STRING)
      (literal (token-literal (previous p)))]
+    [(matches? p NUMBER)
+     (literal (exact->inexact (assert (token-literal (previous p)) number?)))]
     [(matches? p IDENTIFIER)
      (variable (previous p))]
     [(matches? p SUPER)
@@ -387,10 +371,7 @@
 (define (synchronize p)
   (advance! p)
   (define keywords (list CLASS FUN VAR FOR IF WHILE PRINT RETURN))
-  (while (not (at-end? p))
-         (cond
-           [(equal? (token-type (previous p)) SEMICOLON)
-            (void)]
-           [(member (token-type (peek p)) keywords)
-            (void)]
-           [else (advance! p)])))
+  (while (not (or (at-end? p)
+                  (equal? (token-type (previous p)) SEMICOLON)
+                  (member (token-type (peek p)) keywords)))
+         (advance! p)))
