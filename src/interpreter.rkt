@@ -262,12 +262,15 @@
 (define (eval-binary i expr)
   (match-define (binary l operator r) expr)
   (define left (evaluate i l))
-  (define right (evaluate i r))
+  (define right
+    (match (token-type operator)
+      [(or (quote OR) (quote AND)) #f]
+      [_ (evaluate i r)]))
   (match (token-type operator)
     [(quote OR)
-     (if (truthy? left) left right)]
+     (if (truthy? left) left (evaluate i r))]
     [(quote AND)
-     (if (truthy? left) right left)]
+     (if (truthy? left) (evaluate i r) left)]
     [(quote BANG_EQUAL)
      (not (lox-equal? left right))]
     [(quote EQUAL_EQUAL)
