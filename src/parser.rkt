@@ -320,7 +320,7 @@
 (: left-assosiative-binary (-> Parser (-> Parser Expr) (Listof Symbol) Expr))
 (define (left-assosiative-binary p token-parser token-matches)
   (define expr (token-parser p))
-  (while (apply ((curry matches?) p) token-matches)
+  (while (apply matches? p token-matches)
          (define operator (previous p))
          (define right (token-parser p))
          (set! expr (binary expr operator right)))
