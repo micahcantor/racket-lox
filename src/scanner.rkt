@@ -72,7 +72,7 @@
     [#\" (scan-string! s)] ; string literals
     [(? char-numeric?) (scan-number! s)] ; number literals
     [(? char-identifier-start?) (scan-identifier! s)] ; identifiers
-    [_ (report-error (scanner-line s) "Unexpected character.")]))
+    [_ (report-error (scanner-line s) "" "Unexpected character.")]))
 
 (: at-end? (-> Scanner Boolean))
 (define (at-end? s) 
@@ -123,7 +123,7 @@
          (advance! s))
   (cond
     [(at-end? s) 
-     (report-error (scanner-line s) "Unterminated string.")]
+     (report-error (scanner-line s) "" "Unterminated string.")]
     [else
      (advance! s) ; consume the closing "
      ; trim the surrounding quotes, add token

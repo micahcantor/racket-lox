@@ -29,7 +29,7 @@
 (: make-parse-error (-> Token String exn:parse-error))
 (define (make-parse-error token message)
   (lox-error token message) ; print error message and set had-error
-  (exn:parse-error (lox-error-message (token-line token) message)
+  (exn:parse-error (lox-error-message (token-line token) "" message)
                    (current-continuation-marks)))
 
 (: raise-parse-error (-> Token String exn:parse-error))
@@ -71,14 +71,14 @@
 (define (lox-error t message)
   (match-define (token type lexeme _ line) t)
   (if (equal? type EOF)
-      (report-error line "at end" message)
-      (report-error line (format "at '~a'" lexeme) message)))
+      (report-error line " at end" message)
+      (report-error line (format " at '~a'" lexeme) message)))
 
-(: report-error (->* (Integer String) (String) Void))
-(define (report-error line message [where ""])
+(: report-error (-> Integer String String Void))
+(define (report-error line where message)
   (displayln (lox-error-message line where message) (current-error-port))
   (set-had-error! #t))
 
-(: lox-error-message (->* (Integer String) (String) String))
-(define (lox-error-message line message [where ""])
-  (format "[line ~a] Error ~a: ~a" line where message))
+(: lox-error-message (-> Integer String String String))
+(define (lox-error-message line where message)
+  (format "[line ~a] Error~a: ~a" line where message))

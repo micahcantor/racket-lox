@@ -225,7 +225,7 @@
   (define object (evaluate i obj))
   (if (instance? object)
       (instance-get object name)
-      (raise-runtime-error name (format "Undefined property '~a'." (token-lexeme name)))))
+      (raise-runtime-error name "Only instances have properties.")))
 
 (: eval-set-expr (-> Interpreter SetExpr Any))
 (define (eval-set-expr i expr)
@@ -237,7 +237,7 @@
      (instance-set! object expr-name value)
      value]
     [else
-     (raise-runtime-error expr-name "Only instance have fields.")]))
+     (raise-runtime-error expr-name "Only instances have fields.")]))
 
 (: eval-super-expr (-> Interpreter SuperExpr Any))
 (define (eval-super-expr i expr)
@@ -409,7 +409,7 @@
     [(number? v)
      (define text (number->string v))
      (if (string-suffix? text ".0")
-         (substring text (- (string-length text) 2))
+         (substring text 0 (- (string-length text) 2))
          text)]
     [(callable? v) (callable->string v)]
     [(instance? v) (instance->string v)]
