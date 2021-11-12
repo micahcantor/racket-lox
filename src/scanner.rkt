@@ -8,10 +8,10 @@
 (require "token.rkt")
 (require "error.rkt")
 
-(struct scanner ([source : String] 
-                 [tokens : (Listof Token)] 
-                 [start : Integer] 
-                 [current : Integer] 
+(struct scanner ([source : String]
+                 [tokens : (Listof Token)]
+                 [start : Integer]
+                 [current : Integer]
                  [line : Integer])
   #:mutable)
 
@@ -39,7 +39,7 @@
 
 (: scan-tokens! (-> Scanner (Vectorof Token)))
 (define (scan-tokens! s)
-  (while (not (at-end? s))
+  (until (at-end? s)
          (set-scanner-start! s (scanner-current s)) ; set start of the current scan to the current pos
          (scan-token! s)) ; scan from current pos
   (define eof-token (make-token EOF "" (scanner-line s)))
@@ -75,8 +75,8 @@
     [_ (report-error (scanner-line s) "" "Unexpected character.")]))
 
 (: at-end? (-> Scanner Boolean))
-(define (at-end? s) 
-  (>= (scanner-current s) 
+(define (at-end? s)
+  (>= (scanner-current s)
       (string-length (scanner-source s))))
 
 (: advance! (-> Scanner Char))
@@ -122,7 +122,7 @@
            (scanner-next-line! s))
          (advance! s))
   (cond
-    [(at-end? s) 
+    [(at-end? s)
      (report-error (scanner-line s) "" "Unterminated string.")]
     [else
      (advance! s) ; consume the closing "

@@ -8,3 +8,8 @@
       body ...
       (loop))))
 
+(define-syntax-rule (until pred body ...)
+  (let loop : Void ()
+    (unless pred
+      body ...
+      (loop))))
