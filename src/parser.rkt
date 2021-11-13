@@ -213,32 +213,32 @@
 (: parse-or (-> Parser Expr))
 (define (parse-or p)
   (define token-matches (list OR))
-  (left-assosiative-binary p parse-and token-matches))
+  (parse-left-assosiative-binary p parse-and token-matches))
 
 (: parse-and (-> Parser Expr))
 (define (parse-and p)
   (define token-matches (list AND))
-  (left-assosiative-binary p parse-equality token-matches))
+  (parse-left-assosiative-binary p parse-equality token-matches))
 
 (: parse-equality (-> Parser Expr))
 (define (parse-equality p)
   (define token-matches (list BANG_EQUAL EQUAL_EQUAL))
-  (left-assosiative-binary p parse-comparison token-matches))
+  (parse-left-assosiative-binary p parse-comparison token-matches))
 
 (: parse-comparison (-> Parser Expr))
 (define (parse-comparison p)
   (define token-matches (list GREATER GREATER_EQUAL LESS LESS_EQUAL))
-  (left-assosiative-binary p parse-term token-matches))
+  (parse-left-assosiative-binary p parse-term token-matches))
 
 (: parse-term (-> Parser Expr))
 (define (parse-term p)
   (define token-matches (list MINUS PLUS))
-  (left-assosiative-binary p parse-factor token-matches))
+  (parse-left-assosiative-binary p parse-factor token-matches))
 
 (: parse-factor (-> Parser Expr))
 (define (parse-factor p)
   (define token-matches (list SLASH STAR))
-  (left-assosiative-binary p parse-unary token-matches))
+  (parse-left-assosiative-binary p parse-unary token-matches))
 
 (: parse-unary (-> Parser Expr))
 (define (parse-unary p)
@@ -307,12 +307,12 @@
      (raise-parse-error (peek p) "Expect expression.")
      (empty-expr)]))
 
-; (left-assosiative-binary parser (parser -> token) (listof Token-type)) -> token
+; (parse-left-assosiative-binary parser (parser -> token) (listof Token-type)) -> token
 ; First parse the left side, which can be any expression of higher precedence.
 ; Then recursively parse the right side while the desire tokens match, setting
 ; the final expression to the binary result of the two sides.
-(: left-assosiative-binary (-> Parser (-> Parser Expr) (Listof Symbol) Expr))
-(define (left-assosiative-binary p token-parser token-matches)
+(: parse-left-assosiative-binary (-> Parser (-> Parser Expr) (Listof Symbol) Expr))
+(define (parse-left-assosiative-binary p token-parser token-matches)
   (define expr (token-parser p))
   (while (apply matches? p token-matches)
          (define operator (previous p))
