@@ -4,38 +4,42 @@
 
 (provide (all-defined-out))
 
-(struct expr ())
-(define-type Expr expr)
+(define-type Expr
+  (U AssignExpr BinaryExpr CallExpr GetExpr GroupingExpr LiteralExpr
+     SetExpr SuperExpr ThisExpr UnaryExpr VariableExpr EmptyExpr))
 
-(struct assign expr ([name : Token] [value : Expr]))
+(struct assign ([name : Token] [value : Expr]))
 (define-type AssignExpr assign)
 
-(struct binary expr ([left : Expr] [operator : Token] [right : Expr]))
+(struct binary ([left : Expr] [operator : Token] [right : Expr]))
 (define-type BinaryExpr binary)
 
-(struct call expr ([callee : Expr] [paren : Token] [args : (Listof Expr)]))
+(struct call ([callee : Expr] [paren : Token] [args : (Listof Expr)]))
 (define-type CallExpr call)
 
-(struct get expr ([object : Expr] [name : Token]))
+(struct get ([object : Expr] [name : Token]))
 (define-type GetExpr get)
 
-(struct grouping expr ([expression : Expr]))
+(struct grouping ([expression : Expr]))
 (define-type GroupingExpr grouping)
 
-(struct literal expr ([value : Lox-Literal]))
+(struct literal ([value : Lox-Literal]))
 (define-type LiteralExpr literal)
 
-(struct set-expr expr ([object : Expr] [name : Token] [value : Expr]))
+(struct set-expr ([object : Expr] [name : Token] [value : Expr]))
 (define-type SetExpr set-expr)
 
-(struct super-expr expr ([keyword : Token] [method : Token]))
+(struct super-expr ([keyword : Token] [method : Token]))
 (define-type SuperExpr super-expr)
 
-(struct this-expr expr ([keyword : Token]))
+(struct this-expr ([keyword : Token]))
 (define-type ThisExpr this-expr)
 
-(struct unary expr ([operator : Token] [right : Expr]))
+(struct unary ([operator : Token] [right : Expr]))
 (define-type UnaryExpr unary)
 
-(struct variable expr ([name : Token]))
+(struct variable ([name : Token]))
 (define-type VariableExpr variable)
+
+(struct empty-expr ())
+(define-type EmptyExpr empty-expr)

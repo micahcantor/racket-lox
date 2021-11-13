@@ -4,34 +4,39 @@
 (require "token.rkt")
 (provide (all-defined-out))
 
-(struct stmt ())
-(define-type Stmt stmt)
+(define-type Stmt
+  (U PrintStmt ExpressionStmt VarDecl FunDecl ClassDecl
+     BlockStmt IfStmt WhileStmt ReturnStmt EmptyStmt))
 
-(struct print-stmt stmt ([value : Expr]))
+(struct print-stmt ([value : Expr]))
 (define-type PrintStmt print-stmt)
 
-(struct expression-stmt stmt ([expr : Expr]))
+(struct expression-stmt ([expr : Expr]))
 (define-type ExpressionStmt expression-stmt)
 
-(struct var-decl stmt ([name : Token] [initializer : (Option Expr)]))
+(struct var-decl ([name : Token] [initializer : (Option Expr)]))
 (define-type VarDecl var-decl)
 
-(struct fun-decl stmt ([name : Token] [params : (Vectorof Token)] [body : (Listof Stmt)]))
+(struct fun-decl ([name : Token] [params : (Vectorof Token)] [body : (Listof Stmt)]))
 (define-type FunDecl fun-decl)
 
-(struct class-decl stmt ([name : Token] [superclass : (Option VariableExpr)] [methods : (Listof FunDecl)]))
+(struct class-decl ([name : Token] [superclass : (Option VariableExpr)] [methods : (Listof FunDecl)]))
 (define-type ClassDecl class-decl)
 
-(struct block-stmt stmt ([statements : (Listof Stmt)]))
+(struct block-stmt ([statements : (Listof Stmt)]))
 (define-type BlockStmt block-stmt)
 
-(struct if-stmt stmt ([condition : Expr]
-                      [consequent : Stmt]
-                      [alternate : (Option Stmt)]))
+(struct if-stmt ([condition : Expr]
+                 [consequent : Stmt]
+                 [alternate : (Option Stmt)]))
 (define-type IfStmt if-stmt)
 
-(struct while-stmt stmt ([condition : Expr] [body : Stmt]))
+(struct while-stmt ([condition : Expr] [body : Stmt]))
 (define-type WhileStmt while-stmt)
 
-(struct return-stmt stmt ([keyword : Token] [value : (Option Expr)]))
+(struct return-stmt ([keyword : Token] [value : (Option Expr)]))
 (define-type ReturnStmt return-stmt)
+
+; empty statement created after an error is found.
+(struct empty-stmt ())
+(define-type EmptyStmt empty-stmt)

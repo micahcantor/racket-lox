@@ -1,7 +1,6 @@
 #lang typed/racket/base
 
 (require racket/match)
-(require racket/function)
 (require "utils/while.rkt")
 (require "token.rkt")
 (require "expr.rkt")
@@ -38,7 +37,7 @@
 (: parse-declaration (-> Parser Stmt))
 (define (parse-declaration p)
   ; synchronize after a parse error on a statement.
-  (define (handle-parse-error e) (synchronize p) (stmt))
+  (define (handle-parse-error e) (synchronize p) (empty-stmt))
   (with-handlers ([exn:parse-error? handle-parse-error])
     (cond
       [(matches? p CLASS) (parse-class-declaration p)]
@@ -311,7 +310,7 @@
      (grouping expr)]
     [else
      (raise-parse-error (peek p) "Expect expression.")
-     (expr)]))
+     (empty-expr)]))
 
 ; (left-assosiative-binary parser (parser -> token) (listof Token-type)) -> token
 ; First parse the left side, which can be any expression of higher precedence.
