@@ -14,8 +14,8 @@
 (struct resolver ([interpreter : Interpreter]
                   [scopes : (Stackof (HashTable String Boolean))]
                   [current-function : FunctionType]
-                  [current-class : ClassType]) 
-                  #:mutable)
+                  [current-class : ClassType])
+  #:mutable)
 
 #| Function Type |#
 (struct none ())
@@ -65,9 +65,8 @@
 
 (: resolve-block-stmt! (-> Resolver BlockStmt Void))
 (define (resolve-block-stmt! r stmt)
-  (begin-scope! r)
-  (resolve-all! r (block-stmt-statements stmt))
-  (end-scope! r))
+  (with-scope r
+    (resolve-all! r (block-stmt-statements stmt))))
 
 (: resolve-var-decl! (-> Resolver VarDecl Void))
 (define (resolve-var-decl! r stmt)
@@ -87,12 +86,11 @@
 (define (resolve-function! r function type)
   (define enclosing-function (resolver-current-function r))
   (set-resolver-current-function! r type)
-  (begin-scope! r)
-  (for ([param (fun-decl-params function)])
-    (declare! r param)
-    (define! r param))
-  (resolve-all! r (fun-decl-body function))
-  (end-scope! r)
+  (with-scope r
+    (for ([param (fun-decl-params function)])
+      (declare! r param)
+      (define! r param))
+    (resolve-all! r (fun-decl-body function)))
   (set-resolver-current-function! r enclosing-function))
 
 (: resolve-class-decl! (-> Resolver ClassDecl Void))
@@ -110,16 +108,15 @@
         (resolve! r superclass))
     (begin-scope! r)
     (hash-set! (stack-top (resolver-scopes r)) "super" #t))
-  (begin-scope! r)
-  ; resolve "this" to a local variable within class body.
-  (hash-set! (stack-top (resolver-scopes r)) "this" #t)
-  (for ([m methods])
-    (define declaration
-      (if (equal? "init" (token-lexeme (fun-decl-name m)))
-          (initializer)
-          (method)))
-    (resolve-function! r m declaration))
-  (end-scope! r)
+  (with-scope r
+    ; resolve "this" to a local variable within class body.
+    (hash-set! (stack-top (resolver-scopes r)) "this" #t)
+    (for ([m methods])
+      (define declaration
+        (if (equal? "init" (token-lexeme (fun-decl-name m)))
+            (initializer)
+            (method)))
+      (resolve-function! r m declaration)))
   (when superclass (end-scope! r))
   (set-resolver-current-class! r enclosing-class))
 
@@ -160,7 +157,7 @@
   (when (none? current-function)
     (lox-error (return-stmt-keyword stmt) "Can't return from top-level code."))
   (define value (return-stmt-value stmt))
-  (when value 
+  (when value
     (if (initializer? current-function)
         (lox-error (return-stmt-keyword stmt) "Can't return a value from an initializer.")
         (resolve! r value))))
@@ -201,7 +198,7 @@
      (lox-error keyword "Can't use 'super' outside of a class.")]
     [(class)
      (lox-error keyword "Can't use 'super' in a class with no superclass.")]
-    [else 
+    [else
      (resolve-local! r expr keyword)]))
 
 (: resolve-this-expr! (-> Resolver ThisExpr Void))
@@ -231,6 +228,12 @@
 (define (end-scope! r)
   (define scopes (resolver-scopes r))
   (void (stack-pop! scopes)))
+
+(define-syntax-rule (with-scope r body ...)
+  (begin
+    (begin-scope! r)
+    body ...
+    (end-scope! r)))
 
 (: declare! (-> Resolver Token Void))
 (define (declare! r name)
