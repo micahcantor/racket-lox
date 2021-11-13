@@ -29,7 +29,6 @@
 (struct subclass ())
 (define-type ClassType (U none class subclass))
 
-
 (: make-resolver (-> Interpreter Resolver))
 (define (make-resolver i)
   (resolver i (make-stack) (none) (none)))
