@@ -9,6 +9,10 @@ This interpreter is based on the tree-walking Java interpreter described in part
 - `Callable` is implemented as a union type of `Function`, `NativeFunction` and `Class`. Because of annoyances surrounding cyclic imports, the `Callable`-related code lives in [interpreter.rkt](src/interpreter.rkt) rather than in a separate file.
 - Error related functions are placed in a separate file, [error.rkt](src/error.rkt) rather than with the top-level program interface, which lives in [main.rkt](src/main.rkt).
 
+Despite the differences, racket-lox passes all of [the tests provided by Nystrom](https://github.com/munificent/craftinginterpreters#testing).
+
 ## Running the interpreter
 
-To run the interpreter, simply use `racket src/main.rkt`, passing a `.lox` file as an argument to run a script.
+To run the interpreter, simply use `racket src/main.rkt`, passing a `.lox` file as an argument to run a script. Note that because of the use of typed racket, the interpreter is very slow when run uncompiled. Therefore it's best to use `raco make src/main.rkt` before executing.
+
+To build an executable (e.g. to use with the test runner), use `raco exe -o dist/main src/main.rkt`.
