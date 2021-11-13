@@ -11,17 +11,12 @@
 
 (: parse! (-> Parser (Listof Stmt)))
 (define (parse! p)
-  (define (handle-parse-error e) null)
-  (with-handlers ([exn:parse-error? handle-parse-error])
-    (let loop ([statements : (Listof Stmt) null])
-      (if (at-end? p)
-          (reverse statements)
-          (loop (cons (parse-declaration p) statements))))))
+  (let loop ([statements : (Listof Stmt) null])
+    (if (at-end? p)
+        (reverse statements)
+        (loop (cons (parse-declaration p) statements)))))
 
-(struct parser ([tokens : (Vectorof Token)]
-                [current : Integer])
-  #:mutable)
-
+(struct parser ([tokens : (Vectorof Token)] [current : Integer]) #:mutable)
 (define-type Parser parser)
 
 (: make-parser (-> (Vectorof Token) Parser))
