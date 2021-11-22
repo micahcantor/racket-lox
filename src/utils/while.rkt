@@ -2,14 +2,14 @@
 
 (provide (all-defined-out))
 
-(define-syntax-rule (while pred body ...)
+(define-syntax-rule (while pred? body ...)
   (let loop : Void ()
-    (when pred
+    (when pred?
       body ...
       (loop))))
 
-(define-syntax-rule (until pred body ...)
+(define-syntax-rule (until pred? body ...)
   (let loop : Void ()
-    (unless pred
+    (unless pred?
       body ...
       (loop))))
