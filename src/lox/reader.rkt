@@ -11,7 +11,7 @@
   (define parser (make-parser tokens))
   (define statements (parse! parser))
   (define module-datum `(module lox-mod lox/expander
-                          ,statements))
+                          ,@statements))
   (datum->syntax #f module-datum))
 
 (provide read-syntax)

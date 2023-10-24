@@ -6,10 +6,11 @@
 (define interpreter (make-interpreter))
 (define resolver (make-resolver interpreter))
 
-(define-syntax-rule (lox-module-begin stmts)
+(define-syntax-rule (lox-module-begin STMT ...)
   (#%module-begin 
-    (void 
-      (resolve-all! resolver stmts)
-      (interpret! interpreter stmts))))
+    (void
+      (resolve-all! resolver (list STMT ...))
+      (interpret! interpreter (list STMT ...)))))
 
+(provide #%top #%app #%datum #%top-interaction)
 (provide (rename-out [lox-module-begin #%module-begin]))
