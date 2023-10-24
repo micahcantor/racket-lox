@@ -1,7 +1,7 @@
 #lang racket/base
 
-(require "interpreter.rkt")
-(require "resolver.rkt")
+(require "lib/interpreter.rkt")
+(require "lib/resolver.rkt")
 
 (define interpreter (make-interpreter))
 (define resolver (make-resolver interpreter))

@@ -11,7 +11,7 @@
 (require "class.rkt")
 (require "function.rkt")
 (require "instance.rkt")
-(require "utils/while.rkt")
+(require "../utils/while.rkt")
 
 (provide interpret! make-interpreter interpreter-resolve! Interpreter)
 

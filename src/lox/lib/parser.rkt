@@ -1,7 +1,7 @@
 #lang typed/racket/base
 
 (require racket/match)
-(require "utils/while.rkt")
+(require "../utils/while.rkt")
 (require "token.rkt")
 (require "expr.rkt")
 (require "error.rkt")

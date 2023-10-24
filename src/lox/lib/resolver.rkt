@@ -1,7 +1,7 @@
 #lang typed/racket/base
 
 (require racket/match)
-(require "utils/stack.rkt")
+(require "../utils/stack.rkt")
 (require "error.rkt")
 (require "interpreter.rkt")
 (require "stmt.rkt")

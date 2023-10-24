@@ -4,7 +4,7 @@
 
 (require racket/match)
 (require racket/function)
-(require "utils/while.rkt")
+(require "../utils/while.rkt")
 (require "token.rkt")
 (require "error.rkt")
 

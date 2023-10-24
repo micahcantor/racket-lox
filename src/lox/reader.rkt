@@ -1,8 +1,8 @@
 #lang racket/base
 
 (require racket/port)
-(require "parser.rkt")
-(require "scanner.rkt")
+(require "lib/parser.rkt")
+(require "lib/scanner.rkt")
 
 (define (read-syntax _ port)
   (define source (port->string port))
